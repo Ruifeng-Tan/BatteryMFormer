@@ -1,0 +1,123 @@
+# =========================
+# Python / general
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+*.cache
+
+# =========================
+# Virtual env / env files
+# =========================
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# =========================
+# IDE / editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# =========================
+# Data / artifacts
+# =========================
+*.pkl
+*.pkl.backup
+*.pickle
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.tar.gz
+
+# =========================
+# Images / figures
+# =========================
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
+*.pdf
+
+# =========================
+# Models / checkpoints
+# =========================
+checkpoints/
+checkpoint_*/
+*.pth
+*.pt
+*.ckpt
+*.weights
+*.safetensors
+
+# =========================
+# Logs / tracking
+# =========================
+logs/
+*.log
+tensorboard/
+wandb/
+wandb/*
+
+# =========================
+# Project-specific folders
+# =========================
+legacy/
+outs/
+backup/
+generated_args_json/
+general_scripts/
+train_eval_scripts/
+train_test/
+label_scaler
+
+# datasets (ignore all)
+dataset/
+dataset/*
+
+# If you want to keep certain dataset subfolders in the future,
+# you can add exceptions like:
+# !dataset/README.md
+
+# =========================
+# Ignore entire visualization folder (no exceptions)
+# =========================
+visualization/
+
+# =========================
+# Claude / misc
+# =========================
+*.claude
+CLAUDE.md
+
+# =========================
+# Tests
+# =========================
+test/
+test/*
