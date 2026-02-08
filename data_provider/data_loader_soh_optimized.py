@@ -17,33 +17,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 warnings.filterwarnings('ignore')
-def _print_contiguous_segments(idxs: np.ndarray, name: str = "cutoff_charge"):
-    idxs = np.asarray(idxs, dtype=np.int64)
-    if idxs.size == 0:
-        print(f"[{name}] empty")
-        return
-
-    # 保证有序
-    if idxs.size > 1 and not np.all(idxs[:-1] <= idxs[1:]):
-        idxs = np.sort(idxs)
-
-    diffs = np.diff(idxs)
-    break_pos = np.where(diffs > 1)[0]          # 断点位置（指向“断点前”的那个元素）
-    n_segments = int(break_pos.size + 1)
-
-    # 段的起止在 idxs 的下标空间
-    start_ptrs = np.r_[0, break_pos + 1]
-    end_ptrs   = np.r_[break_pos, idxs.size - 1]
-
-    print(f"[{name}] total={idxs.size}, segments={n_segments}, breaks_at_ptr={break_pos.tolist()}")
-    for si, (sp, ep) in enumerate(zip(start_ptrs, end_ptrs), start=1):
-        seg = idxs[sp:ep+1]
-        print(
-            f"  seg{si}: idx_range=[{int(seg[0])},{int(seg[-1])}], "
-            f"len={seg.size}, head={seg[:5].tolist()}{'...' if seg.size>5 else ''}"
-        )
-
-
 def collate_fn_soh(samples):
     """
     Custom collate function for SOH trajectory prediction
@@ -250,7 +223,7 @@ class Dataset_SOH_Forecasting(Dataset):
                 split_json = f'./data_provider/split_json/fewshot/{self.dataset_name}_split_{self.random_seed}_fewshot{fewshot_pct}.json'
             else:
                 split_json = f'./data_provider/split_json/fewshot/total_split_{self.random_seed}_fewshot{fewshot_pct}.json'
-            print(f"Using fewshot split: {split_json}")
+            print(f"Using data-efficient split: {split_json}")
         else:
             if self.dataset_name != 'Li_ion':
                 split_json = f'./data_provider/split_json/{self.dataset_name}_split_{self.random_seed}.json'
