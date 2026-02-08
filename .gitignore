@@ -92,7 +92,6 @@ outs/
 backup/
 generated_args_json/
 general_scripts/
-train_eval_scripts/
 train_test/
 label_scaler
 

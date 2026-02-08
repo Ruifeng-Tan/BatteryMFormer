@@ -1,0 +1,169 @@
+{
+  "model": "iTransformer",
+  "seed": 42,
+  "n_trials": 10,
+  "best_value": Infinity,
+  "best_params": {
+    "learning_rate": 4.3284502212938785e-05,
+    "d_model": 64,
+    "n_heads": 2,
+    "e_layers": 8,
+    "dropout": 0.30000000000000004,
+    "batch_size": 512,
+    "weight_decay": 0.03142880890840111,
+    "d_ff": 128
+  },
+  "elapsed_time": 2184.4531733989716,
+  "all_trials": [
+    {
+      "number": 0,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 4.3284502212938785e-05,
+        "d_model": 64,
+        "n_heads": 2,
+        "e_layers": 8,
+        "dropout": 0.30000000000000004,
+        "batch_size": 512,
+        "weight_decay": 0.03142880890840111,
+        "d_ff": 128
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 1,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 3.2877474139911175e-05,
+        "d_model": 64,
+        "n_heads": 2,
+        "e_layers": 4,
+        "dropout": 0.25,
+        "batch_size": 128,
+        "weight_decay": 0.005987474910461402,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 2,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 1.289795048085554e-05,
+        "d_model": 128,
+        "n_heads": 8,
+        "e_layers": 5,
+        "dropout": 0.1,
+        "batch_size": 512,
+        "weight_decay": 0.0005975027999960298,
+        "d_ff": 128
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 3,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 8.488762161408708e-05,
+        "d_model": 128,
+        "n_heads": 2,
+        "e_layers": 8,
+        "dropout": 0.1,
+        "batch_size": 512,
+        "weight_decay": 0.001465655388622534,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 4,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 3.001230180898045e-05,
+        "d_model": 256,
+        "n_heads": 4,
+        "e_layers": 3,
+        "dropout": 0.1,
+        "batch_size": 128,
+        "weight_decay": 0.020597335357437203,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 5,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.0002926758115062131,
+        "d_model": 64,
+        "n_heads": 8,
+        "e_layers": 6,
+        "dropout": 0.4,
+        "batch_size": 512,
+        "weight_decay": 0.019158219548093176,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 6,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 7.728716861851788e-05,
+        "d_model": 64,
+        "n_heads": 4,
+        "e_layers": 5,
+        "dropout": 0.4,
+        "batch_size": 512,
+        "weight_decay": 0.000485729517921717,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 7,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00037977679442478547,
+        "d_model": 256,
+        "n_heads": 8,
+        "e_layers": 5,
+        "dropout": 0.35,
+        "batch_size": 128,
+        "weight_decay": 0.00048284249748183273,
+        "d_ff": 512
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 8,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 1.0275701058256678e-05,
+        "d_model": 64,
+        "n_heads": 8,
+        "e_layers": 4,
+        "dropout": 0.25,
+        "batch_size": 512,
+        "weight_decay": 0.07715105777813053,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 9,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 3.0474420508418125e-05,
+        "d_model": 128,
+        "n_heads": 8,
+        "e_layers": 3,
+        "dropout": 0.15000000000000002,
+        "batch_size": 256,
+        "weight_decay": 0.010385003379927421,
+        "d_ff": 128
+      },
+      "state": "TrialState.COMPLETE"
+    }
+  ]
+}

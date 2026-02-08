@@ -1,0 +1,148 @@
+{
+  "model": "PatchMLP",
+  "dataset": "CALB",
+  "seed": 42,
+  "n_trials": 10,
+  "best_value": Infinity,
+  "best_params": {
+    "learning_rate": 0.0002863629311775301,
+    "d_model": 256,
+    "e_layers": 6,
+    "dropout": 0.3,
+    "batch_size": 512,
+    "weight_decay": 0.0007728408410655037
+  },
+  "elapsed_time": 4865.94738984108,
+  "all_trials": [
+    {
+      "number": 0,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.0002863629311775301,
+        "d_model": 256,
+        "e_layers": 6,
+        "dropout": 0.3,
+        "batch_size": 512,
+        "weight_decay": 0.0007728408410655037
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 1,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.0006696361412095061,
+        "d_model": 128,
+        "e_layers": 6,
+        "dropout": 0.3,
+        "batch_size": 256,
+        "weight_decay": 0.0023731716191322015
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 2,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.0007412349520094523,
+        "d_model": 512,
+        "e_layers": 3,
+        "dropout": 0.2,
+        "batch_size": 256,
+        "weight_decay": 0.09922569686545163
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 3,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00016236202668732196,
+        "d_model": 512,
+        "e_layers": 4,
+        "dropout": 0.05,
+        "batch_size": 256,
+        "weight_decay": 0.0017208862824058492
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 4,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00014350172958633488,
+        "d_model": 512,
+        "e_layers": 4,
+        "dropout": 0.25,
+        "batch_size": 512,
+        "weight_decay": 0.022513438121414396
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 5,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00026182881420231926,
+        "d_model": 512,
+        "e_layers": 4,
+        "dropout": 0.1,
+        "batch_size": 256,
+        "weight_decay": 0.0017961369979366821
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 6,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00022877677193653445,
+        "d_model": 256,
+        "e_layers": 6,
+        "dropout": 0.1,
+        "batch_size": 512,
+        "weight_decay": 0.000768997990009173
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 7,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.0005476362975292917,
+        "d_model": 512,
+        "e_layers": 6,
+        "dropout": 0.05,
+        "batch_size": 256,
+        "weight_decay": 0.0005860252012172263
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 8,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00017641645145033473,
+        "d_model": 128,
+        "e_layers": 2,
+        "dropout": 0.15000000000000002,
+        "batch_size": 512,
+        "weight_decay": 0.008973434392421322
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 9,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00035020819623310135,
+        "d_model": 256,
+        "e_layers": 4,
+        "dropout": 0.2,
+        "batch_size": 256,
+        "weight_decay": 0.015041284977195537
+      },
+      "state": "TrialState.COMPLETE"
+    }
+  ]
+}

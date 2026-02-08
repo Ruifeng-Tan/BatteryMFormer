@@ -17,6 +17,31 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 warnings.filterwarnings('ignore')
+def _print_contiguous_segments(idxs: np.ndarray, name: str = "cutoff_charge"):
+    idxs = np.asarray(idxs, dtype=np.int64)
+    if idxs.size == 0:
+        print(f"[{name}] empty")
+        return
+
+    # 保证有序
+    if idxs.size > 1 and not np.all(idxs[:-1] <= idxs[1:]):
+        idxs = np.sort(idxs)
+
+    diffs = np.diff(idxs)
+    break_pos = np.where(diffs > 1)[0]          # 断点位置（指向“断点前”的那个元素）
+    n_segments = int(break_pos.size + 1)
+
+    # 段的起止在 idxs 的下标空间
+    start_ptrs = np.r_[0, break_pos + 1]
+    end_ptrs   = np.r_[break_pos, idxs.size - 1]
+
+    print(f"[{name}] total={idxs.size}, segments={n_segments}, breaks_at_ptr={break_pos.tolist()}")
+    for si, (sp, ep) in enumerate(zip(start_ptrs, end_ptrs), start=1):
+        seg = idxs[sp:ep+1]
+        print(
+            f"  seg{si}: idx_range=[{int(seg[0])},{int(seg[-1])}], "
+            f"len={seg.size}, head={seg[:5].tolist()}{'...' if seg.size>5 else ''}"
+        )
 
 
 def collate_fn_soh(samples):
@@ -93,7 +118,7 @@ class Dataset_SOH_Forecasting(Dataset):
         input_mode='current_voltage',
         max_trajectory_len=5200,
         label_scaler=None,
-        alignment_check: bool = False,
+        alignment_check: bool = True,
     ):
         """
         Dataset for SOH trajectory prediction with caching.
@@ -319,6 +344,29 @@ class Dataset_SOH_Forecasting(Dataset):
                 f"discharge_send={float(discharge_s[-1]):.4f}, expected~{low:.4f}"
             )
 
+    @staticmethod
+    def _first_contiguous_block_last_index(idxs: np.ndarray) -> int:
+        """
+        Given sorted indices array (1D), return the last index of the first
+        contiguous block. Contiguous means successive indices differ by 1.
+
+        Example:
+            idxs = [5,6,7, 10,11] -> returns 7
+            idxs = [3,4,5] -> returns 5
+        """
+        if idxs.size == 0:
+            return -1
+        if idxs.size == 1:
+            return int(idxs[0])
+
+        diffs = np.diff(idxs)
+        breaks = np.where(diffs > 1)[0]   # positions where continuity breaks
+        if breaks.size == 0:
+            return int(idxs[-1])          # fully contiguous
+        # first break at position breaks[0], so first block ends at idxs[breaks[0]]
+        return int(idxs[breaks[0]])
+
+
     def _prepare_charge_discharge_curves(self, file_name, cycle_data, nominal_capacity, start_soc, end_soc):
         """
         Prepare charge/discharge curves including SOC calculation.
@@ -378,7 +426,10 @@ class Dataset_SOH_Forecasting(Dataset):
                         curves.append(curve.reshape(1, 4, self.charge_discharge_len))
                     continue
 
-                charge_end_index = cutoff_charge[0][-1]
+                if 'MATR_b1c18' in file_name:
+                    charge_end_index = cutoff_discharge[0][0] - 1
+                else:
+                    charge_end_index = cutoff_charge[0][-1]
                 discharge_end_index = cutoff_discharge[0][-1]
 
                 if prefix in ['RWTH', 'CALB_0', 'CALB_25', 'CALB_45'] or (
