@@ -8,8 +8,6 @@ import pickle
 import json
 from sklearn.preprocessing import StandardScaler
 import warnings
-import hashlib
-import tempfile
 from pathlib import Path
 import matplotlib.pyplot as plt
 
@@ -35,7 +33,6 @@ def collate_fn_soh(samples):
         cycle_curve_data = None
         curve_attn_mask = None
 
-
     soh_input = torch.vstack([i['soh_input'].unsqueeze(0) for i in samples])
     CEs = torch.vstack([i['CEs'].unsqueeze(0) for i in samples])
     DESs = torch.vstack([i['DESs'].unsqueeze(0) for i in samples])
@@ -50,21 +47,19 @@ def collate_fn_soh(samples):
 
     # Expand mask for the 4-channel data (Voltage, Current, Capacity, SOC)
     if cycle_curve_data is not None:
-        tmp_curve_attn_mask = curve_attn_mask.unsqueeze(-1).unsqueeze(-1) * torch.ones_like(cycle_curve_data) # [B, cycle_number, 4, fixed_len]
-        cycle_curve_data[tmp_curve_attn_mask==0] = 0 # set the unseen data as zeros
+        tmp_curve_attn_mask = curve_attn_mask.unsqueeze(-1).unsqueeze(-1) * torch.ones_like(cycle_curve_data)  # [B, cycle_number, 4, fixed_len]
+        cycle_curve_data[tmp_curve_attn_mask == 0] = 0  # set the unseen data as zeros
 
-    soc_curves = cycle_curve_data[:,:,-1] # [B, cycle_number, fixed_len]
-    cycle_curve_data = cycle_curve_data[:,:,:3] # [B, cycle_number, 3, fixed_len]
+    soc_curves = cycle_curve_data[:, :, -1]  # [B, cycle_number, fixed_len]
+    cycle_curve_data = cycle_curve_data[:, :, :3]  # [B, cycle_number, 3, fixed_len]
 
     return cycle_curve_data, curve_attn_mask, soh_input, soh_trajectory, trajectory_mask, aging_condition_embedding, soc_curves, cycle_level_features, life_labels, file_names
 
-# collate function for IC2ML model
+
 def collate_fn_ic2ml(samples):
     """
-    Custom collate function for SOH trajectory prediction
-    Handles both current/voltage input and SOH-to-SOH input modes
+    Custom collate function for SOH trajectory prediction (IC2ML)
     """
-
     cycle_curve_data = torch.vstack([i['cycle_curve_data'].unsqueeze(0) for i in samples])
     curve_attn_mask = torch.vstack([i['curve_attn_mask'].unsqueeze(0) for i in samples])
 
@@ -81,72 +76,83 @@ def collate_fn_ic2ml(samples):
     file_names = [i['file_name'] for i in samples]
 
     # Expand mask for the 4-channel data (Voltage, Current, Capacity, SOC)
-    if cycle_curve_data is not None:
-        tmp_curve_attn_mask = curve_attn_mask.unsqueeze(-1).unsqueeze(-1) * torch.ones_like(cycle_curve_data)
-        cycle_curve_data[tmp_curve_attn_mask==0] = 0 # set the unseen data as zeros
+    tmp_curve_attn_mask = curve_attn_mask.unsqueeze(-1).unsqueeze(-1) * torch.ones_like(cycle_curve_data)
+    cycle_curve_data[tmp_curve_attn_mask == 0] = 0
 
-    capacity_curves = cycle_curve_data[:,:,2] # [B, cycle_number, fixed_len]
+    capacity_curves = cycle_curve_data[:, :, 2]  # [B, cycle_number, fixed_len]
     capacity_attn_mask = curve_attn_mask.unsqueeze(-1)
 
     return capacity_curves, capacity_attn_mask, soh_input, soh_trajectory, trajectory_mask, aging_condition_embedding, soc_curves, cycle_level_features, life_labels, file_names
 
 
 class Dataset_SOH_Forecasting(Dataset):
-    def __init__(self, args, flag='train', input_mode='current_voltage', max_trajectory_len=5200, label_scaler=None):
+    def __init__(
+        self,
+        args,
+        flag='train',
+        input_mode='current_voltage',
+        max_trajectory_len=5200,
+        label_scaler=None,
+        alignment_check: bool = False,
+    ):
         """
-        Optimized Dataset for SOH trajectory prediction with caching
-        
-        Args:
-            args: Arguments containing dataset configuration
-            flag: 'train', 'val', or 'test'
-            input_mode: 'current_voltage' or 'soh_to_soh'
-            max_trajectory_len: Maximum length of SOH trajectory (default 5200)
+        Dataset for SOH trajectory prediction with caching.
+
+        New:
+            alignment_check (bool): if True, run SOC-alignment validity self-checks (cheap, sampled).
         """
         self.args = args
         self.flag = flag
         self.input_mode = input_mode
         self.max_trajectory_len = max_trajectory_len
         self.label_scaler = label_scaler
-        
+
+        # --- NEW: alignment check switch ---
+        self.alignment_check = bool(alignment_check)
+        # Keep defaults internal (no need to change args)
+        self._soc_check_max_cycles_per_battery = getattr(args, 'soc_check_max_cycles_per_battery', 3)
+        self._soc_check_tol = getattr(args, 'soc_check_tol', 2e-3)
+
         # Basic parameters
-        self.ZN_coin_charge_first_file_names = ['ZN-coin_402-1_20231209225636_01_1.pkl', 'ZN-coin_402-2_20231209225727_01_2.pkl', 'ZN-coin_402-3_20231209225844_01_3.pkl', 'ZN-coin_403-1_20231209225922_01_4.pkl', 'ZN-coin_428-1_20231212185048_01_2.pkl', 'ZN-coin_428-2_20231212185058_01_4.pkl', 'ZN-coin_429-1_20231212185129_01_5.pkl', 'ZN-coin_429-2_20231212185157_01_8.pkl', 'ZN-coin_430-1_20231212185250_02_6.pkl', 'ZN-coin_430-2_20231212185305_02_7.pkl', 'ZN-coin_430-3_20231212185323_03_2.pkl']
+        self.ZN_coin_charge_first_file_names = [
+            'ZN-coin_402-1_20231209225636_01_1.pkl', 'ZN-coin_402-2_20231209225727_01_2.pkl',
+            'ZN-coin_402-3_20231209225844_01_3.pkl', 'ZN-coin_403-1_20231209225922_01_4.pkl',
+            'ZN-coin_428-1_20231212185048_01_2.pkl', 'ZN-coin_428-2_20231212185058_01_4.pkl',
+            'ZN-coin_429-1_20231212185129_01_5.pkl', 'ZN-coin_429-2_20231212185157_01_8.pkl',
+            'ZN-coin_430-1_20231212185250_02_6.pkl', 'ZN-coin_430-2_20231212185305_02_7.pkl',
+            'ZN-coin_430-3_20231212185323_03_2.pkl'
+        ]
         self.random_seed = args.seed
         self.root_path = args.root_path if hasattr(args, 'root_path') else '/ai/dl_project/MemoryNet/dataset/cleaned_data'
         self.processed_SOH_path = args.processed_SOH_path
         self.dataset_name = args.dataset
         self.early_cycle_threshold = args.early_cycle_threshold if hasattr(args, 'early_cycle_threshold') else 100
         self.charge_discharge_len = args.charge_discharge_length if hasattr(args, 'charge_discharge_length') else 100
-        self.seq_len = args.seq_len if hasattr(args, 'seq_len') else 100  # For SOH-to-SOH input
+        self.seq_len = args.seq_len if hasattr(args, 'seq_len') else 100
 
-        # New feature: capacity-based resampling (default: False for backward compatibility)
+        # Resampling
         self.use_capacity_resample = getattr(args, 'use_capacity_resample', False)
-        # Number of segments for hierarchical embedding (default: 5)
         self.num_segments = getattr(args, 'num_segments', 5)
 
         self.need_keys = ['current_in_A', 'voltage_in_V', 'charge_capacity_in_Ah', 'discharge_capacity_in_Ah', 'time_in_s']
 
-
-        # Cache directory for preprocessed data
-        
-        # Load data split
+        # Load splits
         self._load_data_files()
-        
-        # Try to load from cache first
+
+        # Cache
         cache_key = self._get_cache_key()
         cache_root = './.cache'
         os.makedirs(cache_root, exist_ok=True)
         cache_file = f"{cache_root}/{cache_key}.pkl"
-        
+
         if os.path.exists(cache_file) and not getattr(args, 'force_reload', False):
             print(f"Loading preprocessed data from cache: {cache_file}")
             with open(cache_file, 'rb') as f:
                 self.samples = pickle.load(f)
         else:
             print(f"Preprocessing data for {self.dataset_name} {flag} {input_mode}...")
-            # Load and prepare data
             self.samples = []
             self._prepare_samples()
-
 
             print(f"Saving preprocessed data to cache: {cache_file}")
             with open(cache_file, 'wb') as f:
@@ -155,65 +161,63 @@ class Dataset_SOH_Forecasting(Dataset):
         print(f"Loaded {len(self.samples)} samples for {flag} set")
 
     def read_cell_data_according_to_prefix(self, file_name):
-        '''
-        Read the battery data and eol according to the file_name
-        The dataset is indicated by the prefix of the file_name
-        '''
         prefix = file_name.split('_')[0]
 
         if prefix.startswith('MATR'):
-            data =  pickle.load(open(f'{self.root_path}/MATR/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/MATR/{file_name}', 'rb'))
         elif prefix.startswith('HUST'):
-            data =  pickle.load(open(f'{self.root_path}/HUST/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/HUST/{file_name}', 'rb'))
         elif prefix.startswith('SNL'):
-            data =  pickle.load(open(f'{self.root_path}/SNL/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/SNL/{file_name}', 'rb'))
         elif prefix.startswith('CALCE'):
-            data =  pickle.load(open(f'{self.root_path}/CALCE/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/CALCE/{file_name}', 'rb'))
         elif prefix.startswith('HNEI'):
-            data =  pickle.load(open(f'{self.root_path}/HNEI/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/HNEI/{file_name}', 'rb'))
         elif prefix.startswith('MICH'):
-            data =  pickle.load(open(f'{self.root_path}/total_MICH/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/total_MICH/{file_name}', 'rb'))
         elif prefix.startswith('OX'):
-            data =  pickle.load(open(f'{self.root_path}/OX/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/OX/{file_name}', 'rb'))
         elif prefix.startswith('RWTH'):
-            data =  pickle.load(open(f'{self.root_path}/RWTH/{file_name}', 'rb'))  
+            data = pickle.load(open(f'{self.root_path}/RWTH/{file_name}', 'rb'))
         elif prefix.startswith('UL-PUR'):
-            data =  pickle.load(open(f'{self.root_path}/UL_PUR/{file_name}', 'rb'))  
+            data = pickle.load(open(f'{self.root_path}/UL_PUR/{file_name}', 'rb'))
         elif prefix.startswith('SMICH'):
-            data =  pickle.load(open(f'{self.root_path}/MICH_EXP/{file_name[1:]}', 'rb')) 
+            data = pickle.load(open(f'{self.root_path}/MICH_EXP/{file_name[1:]}', 'rb'))
         elif prefix.startswith('BIT2'):
-            data =  pickle.load(open(f'{self.root_path}/BIT2/{file_name}', 'rb')) 
+            data = pickle.load(open(f'{self.root_path}/BIT2/{file_name}', 'rb'))
         elif prefix.startswith('Tongji'):
-            data =  pickle.load(open(f'{self.root_path}/Tongji/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/Tongji/{file_name}', 'rb'))
         elif prefix.startswith('Stanford'):
             file_name = file_name.replace('_Ref', '')
-            data =  pickle.load(open(f'{self.root_path}/Stanford_2/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/Stanford_2/{file_name}', 'rb'))
         elif prefix.startswith('ISU-ILCC'):
-            data =  pickle.load(open(f'{self.root_path}/ISU_ILCC/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/ISU_ILCC/{file_name}', 'rb'))
         elif prefix.startswith('XJTU'):
-            data =  pickle.load(open(f'{self.root_path}/XJTU/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/XJTU/{file_name}', 'rb'))
         elif prefix.startswith('ZN-coin'):
-            data =  pickle.load(open(f'{self.root_path}/ZN-coin/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/ZN-coin/{file_name}', 'rb'))
         elif prefix.startswith('CALB'):
-            data =  pickle.load(open(f'{self.root_path}/CALB/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/CALB/{file_name}', 'rb'))
         elif prefix.startswith('NA-ion'):
-            data =  pickle.load(open(f'{self.root_path}/NA-ion/{file_name}', 'rb'))
+            data = pickle.load(open(f'{self.root_path}/NA-ion/{file_name}', 'rb'))
+        else:
+            raise ValueError(f"Unknown prefix: {prefix} (file={file_name})")
 
         return data
 
     def _get_cache_key(self):
-        """Generate unique cache key based on configuration"""
-        # Updated suffix to _v3_soc to invalidate old caches without SOC data
-        key_str = f"{self.dataset_name}_{self.args.seed}_{self.flag}_{self.input_mode}_{self.early_cycle_threshold}_{self.charge_discharge_len}_{self.seq_len}_{self.max_trajectory_len}_capresample{self.use_capacity_resample}_v3_soc"
-        # Append fewshot suffix for train set when fewshot_ratio is active
+        # Include alignment_check into cache key to avoid mixing checked/unchecked preprocessing
+        key_str = (
+            f"{self.dataset_name}_{self.args.seed}_{self.flag}_{self.input_mode}_"
+            f"{self.early_cycle_threshold}_{self.charge_discharge_len}_{self.seq_len}_{self.max_trajectory_len}_"
+            f"capresample{self.use_capacity_resample}_v3_soc_alignchk{int(self.alignment_check)}"
+        )
         fewshot_ratio = getattr(self.args, 'fewshot_ratio', None)
         if fewshot_ratio and self.flag == 'train' and 0 < fewshot_ratio < 1:
             key_str += f"_fewshot{int(fewshot_ratio * 100)}"
         return key_str
-    
+
     def _load_data_files(self):
-        """Load train/val/test file splits"""
-        # Check if fewshot mode is active for training
         fewshot_ratio = getattr(self.args, 'fewshot_ratio', None)
         if fewshot_ratio and self.flag == 'train' and 0 < fewshot_ratio < 1:
             fewshot_pct = int(fewshot_ratio * 100)
@@ -234,6 +238,8 @@ class Dataset_SOH_Forecasting(Dataset):
             files = json.load(open(split_json))['val']
         elif self.flag == 'test':
             files = json.load(open(split_json))['test']
+        else:
+            raise ValueError(f"flag must be in ['train','val','test'], got {self.flag}")
 
         if self.dataset_name == 'Li_ion':
             selected_files = []
@@ -241,73 +247,98 @@ class Dataset_SOH_Forecasting(Dataset):
                 if 'ZN-coin' in one_file or 'CALB' in one_file or 'NA-ion' in one_file:
                     continue
                 selected_files.append(one_file)
-
             files = selected_files
 
         self.files = files
-    
+
     @staticmethod
     def _sanitize_vector(values, fill_value=0.0):
-        """Replace NaN/Inf values with a safe fill value while preserving shape."""
         arr = np.asarray(values, dtype=np.float32)
         if np.isnan(arr).any() or np.isinf(arr).any():
-            # print(arr)
-            # raise Exception('NaN or Inf values found in vector')
             return np.nan_to_num(arr, nan=fill_value, posinf=fill_value, neginf=fill_value)
         return arr
 
-    def _calculate_soh_trajectory(self, cycle_data, dataset_name, nominal_capacity, soc_interval=None):
+    def _soc_alignment_sanity_check(
+        self,
+        file_name: str,
+        cycle_idx: int,
+        start_soc: float,
+        end_soc: float,
+        charge_s: np.ndarray,
+        discharge_s: np.ndarray,
+        tol: float,
+    ):
         """
-        Calculate SOH trajectory from cycle data with discharge depth correction
+        SOC-alignment validity check (sampled, cheap).
+        Raise ValueError with file/cycle info if check fails.
         """
-        if len(cycle_data) == 0:
-            return np.array([])
+        charge_s = np.asarray(charge_s, dtype=np.float32)
+        discharge_s = np.asarray(discharge_s, dtype=np.float32)
 
-        if soc_interval is None:
-            soc_interval = [0, 1]
+        if charge_s.size == 0 or discharge_s.size == 0:
+            raise ValueError(f"[SOCCheck] empty SOC curve: file={file_name}, cycle={cycle_idx}")
 
-        discharge_depth = soc_interval[1] - soc_interval[0]
-        discharge_depth = max(discharge_depth, 1e-6)
+        # Monotonicity
+        if np.any(np.diff(charge_s) < -1e-5):
+            raise ValueError(
+                f"[SOCCheck] charge SOC not non-decreasing: file={file_name}, cycle={cycle_idx}, "
+                f"min_diff={float(np.diff(charge_s).min())}"
+            )
+        if np.any(np.diff(discharge_s) > 1e-5):
+            raise ValueError(
+                f"[SOCCheck] discharge SOC not non-increasing: file={file_name}, cycle={cycle_idx}, "
+                f"max_diff={float(np.diff(discharge_s).max())}"
+            )
 
-        if dataset_name == 'CALB':
-            first_cycle_caps = self._sanitize_vector(cycle_data[0].get('discharge_capacity_in_Ah', []), fill_value=0.0)
-            denominator = float(first_cycle_caps.max()) if first_cycle_caps.size > 0 else 1.0
-            denominator = max(denominator, 1e-6)
-        else:
-            denominator = max(float(nominal_capacity), 1e-6)
+        low, high = float(min(start_soc, end_soc)), float(max(start_soc, end_soc))
 
-        soh_trajectory = np.zeros(len(cycle_data))
-        for i, cycle in enumerate(cycle_data):
-            discharge_curve = self._sanitize_vector(cycle.get('discharge_capacity_in_Ah', []), fill_value=0.0)
-            if discharge_curve.size > 0:
-                current_capacity = float(discharge_curve.max(initial=0.0))
-                capacity_ratio = current_capacity / denominator
-                soh_trajectory[i] = capacity_ratio / discharge_depth
-            else:
-                raise Exception('The discharge data should not be empty!')
+        # Range within battery SOC interval
+        ch_min, ch_max = float(charge_s.min()), float(charge_s.max())
+        dis_min, dis_max = float(discharge_s.min()), float(discharge_s.max())
 
-        return soh_trajectory
-    
-    def _prepare_charge_discharge_curves(self, file_name,  cycle_data, nominal_capacity, start_soc, end_soc):
+        if ch_min < low - tol or ch_max > high + tol:
+            raise ValueError(
+                f"[SOCCheck] charge SOC out of interval: file={file_name}, cycle={cycle_idx}, "
+                f"charge_range=[{ch_min:.4f},{ch_max:.4f}], interval=[{low:.4f},{high:.4f}]"
+            )
+        if dis_min < low - tol or dis_max > high + tol:
+            raise ValueError(
+                f"[SOCCheck] discharge SOC out of interval: file={file_name}, cycle={cycle_idx}, "
+                f"discharge_range=[{dis_min:.4f},{dis_max:.4f}], interval=[{low:.4f},{high:.4f}]"
+            )
+
+        # Soft endpoint checks (use wider tolerance)
+        if abs(float(charge_s[0]) - low) > 5 * tol:
+            raise ValueError(
+                f"[SOCCheck] charge start SOC deviates: file={file_name}, cycle={cycle_idx}, "
+                f"charge_s0={float(charge_s[0]):.4f}, expected~{low:.4f}"
+            )
+        if abs(float(discharge_s[-1]) - low) > 5 * tol:
+            raise ValueError(
+                f"[SOCCheck] discharge end SOC deviates: file={file_name}, cycle={cycle_idx}, "
+                f"discharge_send={float(discharge_s[-1]):.4f}, expected~{low:.4f}"
+            )
+
+    def _prepare_charge_discharge_curves(self, file_name, cycle_data, nominal_capacity, start_soc, end_soc):
         """
         Prepare charge/discharge curves including SOC calculation.
-        Returns array of shape [early_cycles, 4, charge_discharge_len]
-        Channels: [Voltage, Current, Capacity, SOC]
+        Returns:
+            curves: [early_cycles, 4, charge_discharge_len]
+            channels: [Voltage, Current, Capacity, SOC]
         """
         curves = []
-        coulumbic_efficiencys = [] 
+        coulumbic_efficiencys = []
         energy_efficiencys = []
-        
-        # Calculate the SOC swing range
-        soc_range = end_soc - start_soc
+
+        soc_range = float(end_soc - start_soc)
         prefix = file_name.split('_')[0]
         if prefix == 'CALB':
             prefix = file_name.split('_')[:2]
             prefix = '_'.join(prefix)
 
-        for cycle_idx in range(self.seq_len, self.early_cycle_threshold+1):
+        for cycle_idx in range(self.seq_len, self.early_cycle_threshold + 1):
             if cycle_idx < len(cycle_data):
-                cycle = cycle_data[cycle_idx-1]
+                cycle = cycle_data[cycle_idx - 1]
 
                 # Extract data
                 cycle_df = pd.DataFrame()
@@ -315,121 +346,132 @@ class Dataset_SOH_Forecasting(Dataset):
                     cycle_df[key] = cycle[key]
 
                 # Data cleaning
-                cycle_df.loc[cycle_df['charge_capacity_in_Ah']<0] = np.nan
-                cycle_df.loc[cycle_df['discharge_capacity_in_Ah']<0] = np.nan
+                cycle_df.loc[cycle_df['charge_capacity_in_Ah'] < 0] = np.nan
+                cycle_df.loc[cycle_df['discharge_capacity_in_Ah'] < 0] = np.nan
                 cycle_df.bfill(inplace=True)
                 cycle_df.ffill(inplace=True)
 
                 time_in_s_records = self._sanitize_vector(cycle_df['time_in_s'])
-                time_in_h_records = time_in_s_records / 3600
+                time_in_h_records = time_in_s_records / 3600.0
                 voltage = self._sanitize_vector(cycle_df['voltage_in_V'])
                 current = self._sanitize_vector(cycle_df['current_in_A'])
                 charge_cap = self._sanitize_vector(cycle_df['charge_capacity_in_Ah'])
                 discharge_cap = self._sanitize_vector(cycle_df['discharge_capacity_in_Ah'])
-                
 
-                # Find charge and discharge segments
-                current_c_rate = current / nominal_capacity
-                charge_indices = current_c_rate >= 0.01
-                discharge_indices = current_c_rate <= -0.01
+                current_c_rate = current / float(nominal_capacity)
 
-                cutoff_voltage_indices = np.nonzero(current_c_rate>=0.01) # This includes constant-voltage charge data, 49th cycle of MATR_b1c18 has some abnormal voltage records
-                charge_end_index = cutoff_voltage_indices[0][-1] # after charge_end_index, there are rest after charge, discharge, and rest after discharge data
+                # Determine charge/discharge end indices
+                cutoff_charge = np.nonzero(current_c_rate >= 0.01)
+                cutoff_discharge = np.nonzero(current_c_rate <= -0.01)
+                if cutoff_charge[0].size == 0 or cutoff_discharge[0].size == 0:
+                    # Bad cycle: pad zeros
+                    if self.input_mode == 'capacity_increment':
+                        curve = np.zeros((4, self.charge_discharge_len // 2), dtype=np.float32)
+                    else:
+                        curve = np.zeros((4, self.charge_discharge_len), dtype=np.float32)
+                    CE, EE = 0.0, 0.0
+                    coulumbic_efficiencys.append(CE)
+                    energy_efficiencys.append(EE)
+                    if self.input_mode == 'capacity_increment':
+                        curves.append(curve.reshape(1, 4, self.charge_discharge_len // 2))
+                    else:
+                        curves.append(curve.reshape(1, 4, self.charge_discharge_len))
+                    continue
 
-                cutoff_voltage_indices = np.nonzero(current_c_rate<=-0.01) 
-                discharge_end_index = cutoff_voltage_indices[0][-1]
-                
-                if prefix in ['RWTH', 'CALB_0', 'CALB_25', 'CALB_45'] or (file_name not in self.ZN_coin_charge_first_file_names and prefix=='ZN-coin'):
-                    # Every cycle first discharge and then charge
-                    #capacity_in_battery = np.where(charge_capacity_records==0, discharge_capacity_records, charge_capacity_records)
-                    
+                charge_end_index = cutoff_charge[0][-1]
+                discharge_end_index = cutoff_discharge[0][-1]
+
+                if prefix in ['RWTH', 'CALB_0', 'CALB_25', 'CALB_45'] or (
+                    file_name not in self.ZN_coin_charge_first_file_names and prefix == 'ZN-coin'
+                ):
+                    # First discharge then charge
                     v_dis = voltage[:discharge_end_index]
                     c_dis = discharge_cap[:discharge_end_index]
                     i_dis = current[:discharge_end_index]
                     time_in_h_dis = time_in_h_records[:discharge_end_index]
-                    
+
                     v_chg = voltage[discharge_end_index:]
                     c_chg = charge_cap[discharge_end_index:]
                     i_chg = current[discharge_end_index:]
-                    i_chg_in_c_rates = i_chg / nominal_capacity
                     time_in_h_chg = time_in_h_records[discharge_end_index:]
-                    
-                    v_chg = v_chg[np.abs(i_chg_in_c_rates)>0.01]
-                    c_chg = c_chg[np.abs(i_chg_in_c_rates)>0.01]
-                    time_in_h_chg = time_in_h_chg[np.abs(i_chg_in_c_rates)>0.01]
-                    i_chg = i_chg[np.abs(i_chg_in_c_rates)>0.01]
+
+                    i_chg_in_c_rates = i_chg / float(nominal_capacity)
+                    valid_chg = np.abs(i_chg_in_c_rates) > 0.01
+                    v_chg, c_chg, i_chg, time_in_h_chg = v_chg[valid_chg], c_chg[valid_chg], i_chg[valid_chg], time_in_h_chg[valid_chg]
 
                     power_dis = v_dis * np.abs(i_dis)
-                    energy_discharge = np.trapz(power_dis, time_in_h_dis)
+                    energy_discharge = np.trapz(power_dis, time_in_h_dis) if time_in_h_dis.size > 1 else 0.0
 
                     power_chg = v_chg * np.abs(i_chg)
-                    energy_charge = np.trapz(power_chg, time_in_h_chg)
+                    energy_charge = np.trapz(power_chg, time_in_h_chg) if time_in_h_chg.size > 1 else 1e-6
                 else:
-                    # Every cycle first charge and then discharge
-                    #capacity_in_battery = np.where(np.logical_and(current_records>=-(nominal_capacity*0.01), discharge_capacity_records<=nominal_capacity*0.01), charge_capacity_records, discharge_capacity_records)
+                    # First charge then discharge
                     v_dis = voltage[charge_end_index:]
                     c_dis = discharge_cap[charge_end_index:]
                     i_dis = current[charge_end_index:]
-                    i_dis_in_c_rates = i_dis / nominal_capacity
                     time_in_h_dis = time_in_h_records[charge_end_index:]
-                    
-                    v_dis = v_dis[np.abs(i_dis_in_c_rates)>0.01]
-                    c_dis = c_dis[np.abs(i_dis_in_c_rates)>0.01]
-                    time_in_h_dis = time_in_h_dis[np.abs(i_dis_in_c_rates)>0.01]
-                    i_dis = i_dis[np.abs(i_dis_in_c_rates)>0.01]
-                    
-                    
+
+                    i_dis_in_c_rates = i_dis / float(nominal_capacity)
+                    valid_dis = np.abs(i_dis_in_c_rates) > 0.01
+                    v_dis, c_dis, i_dis, time_in_h_dis = v_dis[valid_dis], c_dis[valid_dis], i_dis[valid_dis], time_in_h_dis[valid_dis]
+
                     v_chg = voltage[:charge_end_index]
                     c_chg = charge_cap[:charge_end_index]
                     i_chg = current[:charge_end_index]
                     time_in_h_chg = time_in_h_records[:charge_end_index]
 
                     power_dis = v_dis * np.abs(i_dis)
-                    energy_discharge = np.trapz(power_dis, time_in_h_dis)
+                    energy_discharge = np.trapz(power_dis, time_in_h_dis) if time_in_h_dis.size > 1 else 0.0
 
                     power_chg = v_chg * np.abs(i_chg)
-                    energy_charge = np.trapz(power_chg, time_in_h_chg)
-                
-                EE = energy_discharge / energy_charge
-                CE = max(c_dis) / max(c_chg) # Coulombic efficiency
+                    energy_charge = np.trapz(power_chg, time_in_h_chg) if time_in_h_chg.size > 1 else 1e-6
 
-                # if np.isinf(EE):
-                #     print(cycle_idx)
-                #     print(file_name, energy_discharge, energy_charge, time_in_h_chg, discharge_end_index, len(voltage))
-                    
-                # --- 2. Calculate Raw SOC Sequences ---
-                # Charge: SOC increases from start_soc to end_soc based on accumulated capacity
+                EE = float(energy_discharge) / float(max(energy_charge, 1e-6))
+                CE = float(max(c_dis) / max(max(c_chg), 1e-6)) if len(c_dis) > 0 and len(c_chg) > 0 else 0.0
+
+                # --- SOC construction with zero-division guards ---
                 if len(c_chg) > 0:
-                    c_chg_delta = c_chg.max() - c_chg.min()
-                    # Normalize capacity 0~1 and map to SOC range
-                    soc_chg = start_soc + ((c_chg - c_chg[0]) / c_chg_delta) * soc_range
+                    c_chg_delta = float(max(c_chg.max() - c_chg.min(), 1e-6))
+                    soc_chg = float(start_soc) + ((c_chg - c_chg[0]) / c_chg_delta) * soc_range
                 else:
-                    soc_chg = np.array([])
+                    soc_chg = np.array([], dtype=np.float32)
 
-                # Discharge: SOC decreases from end_soc to start_soc
                 if len(c_dis) > 0:
-                    c_dis_delta = c_dis.max() - c_dis.min()
-                    # Discharge capacity usually starts at 0 and increases as battery empties
-                    # So: SOC = End - (Capacity_Used / Total_Capacity_Used) * Range
-                    soc_dis = end_soc - ((c_dis - c_dis[0]) / c_dis_delta) * soc_range
+                    c_dis_delta = float(max(c_dis.max() - c_dis.min(), 1e-6))
+                    soc_dis = float(end_soc) - ((c_dis - c_dis[0]) / c_dis_delta) * soc_range
                 else:
-                    soc_dis = np.array([])
+                    soc_dis = np.array([], dtype=np.float32)
 
-                # --- 3. Resample ---
+                # --- Resample ---
                 charge_len = self.charge_discharge_len // 2
                 discharge_len = self.charge_discharge_len // 2
 
                 if self.use_capacity_resample:
-                    if 'BattMFormer' in self.args.model:
-                        # SOC-based interpolation (Physical Alignment)
-                        charge_v, charge_i, charge_c, charge_s = self._capacity_based_resample(
-                            v_chg, i_chg, soc_chg, c_chg, charge_len, is_charge=True
+                    if 'BatteryMFormer' in self.args.model:
+                        # STRICT SOC-aligned interpolation
+                        charge_v, charge_i, charge_c, charge_s = self._soc_based_resample(
+                            v_chg, i_chg, c_chg, soc_chg, charge_len, is_charge=True
                         )
-                        discharge_v, discharge_i, discharge_c, discharge_s = self._capacity_based_resample(
-                            v_dis, i_dis, soc_dis, c_dis, discharge_len, is_charge=False
+                        discharge_v, discharge_i, discharge_c, discharge_s = self._soc_based_resample(
+                            v_dis, i_dis, c_dis, soc_dis, discharge_len, is_charge=False
                         )
+
+                        # --- NEW: validity self-check (sampled) ---
+                        if (
+                            self.alignment_check
+                            and (cycle_idx - self.seq_len) < int(self._soc_check_max_cycles_per_battery)
+                        ):
+                            self._soc_alignment_sanity_check(
+                                file_name=file_name,
+                                cycle_idx=cycle_idx,
+                                start_soc=float(start_soc),
+                                end_soc=float(end_soc),
+                                charge_s=np.asarray(charge_s),
+                                discharge_s=np.asarray(discharge_s),
+                                tol=float(self._soc_check_tol),
+                            )
                     else:
-                        # Capacity-based interpolation (Physical Alignment)
+                        # Keep original capacity-based for other models
                         charge_v, charge_i, charge_c, charge_s = self._capacity_based_resample(
                             v_chg, i_chg, c_chg, soc_chg, charge_len, is_charge=True
                         )
@@ -437,7 +479,7 @@ class Dataset_SOH_Forecasting(Dataset):
                             v_dis, i_dis, c_dis, soc_dis, discharge_len, is_charge=False
                         )
                 else:
-                    # Index-based interpolation (Fast)
+                    # Index-based interpolation
                     charge_v = self._fast_resample(v_chg, charge_len)
                     charge_i = self._fast_resample(i_chg, charge_len)
                     charge_c = self._fast_resample(c_chg, charge_len)
@@ -448,26 +490,21 @@ class Dataset_SOH_Forecasting(Dataset):
                     discharge_c = self._fast_resample(c_dis, discharge_len)
                     discharge_s = self._fast_resample(soc_dis, discharge_len)
 
-                # --- 4. Combine and Stack ---
+                # --- Combine and Stack ---
                 if self.input_mode == 'capacity_increment':
-                    # For capacity increment mode, we only need charge capacity data
                     voltage_curve = self._sanitize_vector(charge_v)
                     current_curve = self._sanitize_vector(charge_i)
                     capacity_curve = self._sanitize_vector(charge_c)
                     soc_curve = self._sanitize_vector(charge_s)
 
-                    # Normalize capacity increment
-                    capacity_increment_curve = (capacity_curve - capacity_curve[0]) / nominal_capacity
+                    capacity_increment_curve = (capacity_curve - capacity_curve[0]) / float(nominal_capacity)
 
-                    # Normalize current to C-rate
                     if nominal_capacity == 0 or not nominal_capacity:
                         raise Exception('Nominal capacity should not be none or 0 Ah!')
-                    current_curve = current_curve / nominal_capacity
+                    current_curve = current_curve / float(nominal_capacity)
 
-                    # Stack: [4, Length] -> [Voltage, Current, Capacity, SOC]
                     curve = np.stack([voltage_curve, current_curve, capacity_increment_curve, soc_curve])
                     curve = self._sanitize_vector(curve)
-
                 else:
                     voltage_curve = np.concatenate([charge_v, discharge_v])
                     current_curve = np.concatenate([charge_i, discharge_i])
@@ -479,120 +516,164 @@ class Dataset_SOH_Forecasting(Dataset):
                     capacity_curve = self._sanitize_vector(capacity_curve)
                     soc_curve = self._sanitize_vector(soc_curve)
 
-                    # Normalize current to C-rate
                     if nominal_capacity == 0 or not nominal_capacity:
                         raise Exception('Nominal capacity should not be none or 0 Ah!')
-                    current_curve = current_curve / nominal_capacity
+                    current_curve = current_curve / float(nominal_capacity)
 
-                    # Stack: [4, Length] -> [Voltage, Current, Capacity, SOC]
                     curve = np.stack([voltage_curve, current_curve, capacity_curve, soc_curve])
                     curve = self._sanitize_vector(curve)
             else:
-                # Pad with zeros if not enough cycles (4 channels now)
-                # raise Exception(f'{file_name} cell does not have enough cycles to form a complete input!')
+                # Pad with zeros
                 if self.input_mode == 'capacity_increment':
-                    curve = np.zeros((4, self.charge_discharge_len//2))
+                    curve = np.zeros((4, self.charge_discharge_len // 2), dtype=np.float32)
                 else:
-                    curve = np.zeros((4, self.charge_discharge_len))
-                
-                CE = 0
-                EE = 0
+                    curve = np.zeros((4, self.charge_discharge_len), dtype=np.float32)
+                CE, EE = 0.0, 0.0
 
             coulumbic_efficiencys.append(CE)
             energy_efficiencys.append(EE)
 
             if self.input_mode == 'capacity_increment':
-                # only use charge data
-                curves.append(curve.reshape(1, 4, self.charge_discharge_len//2))
+                curves.append(curve.reshape(1, 4, self.charge_discharge_len // 2))
             else:
                 curves.append(curve.reshape(1, 4, self.charge_discharge_len))
 
         curves = np.concatenate(curves, axis=0)
         return np.array(curves), np.array(coulumbic_efficiencys), np.array(energy_efficiencys)
 
-    def _capacity_based_resample(self, voltage, current, capacity, soc, target_length, is_charge=True):
+    def _soc_based_resample(self, voltage, current, capacity, soc, target_length, is_charge=True):
         """
-        Resample curves including SOC based on capacity alignment.
+        Strict SOC-aligned resampling:
+        interpolate v/i/c as functions of SOC onto an equally-spaced SOC grid.
         """
-        if len(capacity) == 0 or len(voltage) == 0:
-            return np.zeros(target_length), np.zeros(target_length), np.zeros(target_length), np.zeros(target_length)
+        if len(soc) == 0 or len(voltage) == 0:
+            z = np.zeros(target_length, dtype=np.float32)
+            return z, z, z, z
 
         voltage = self._sanitize_vector(voltage)
         current = self._sanitize_vector(current)
         capacity = self._sanitize_vector(capacity)
         soc = self._sanitize_vector(soc)
 
-        # Handle dirty data: ensure capacity is monotonically increasing
-        capacity_monotonic = np.maximum.accumulate(capacity)
+        # Enforce monotonic SOC (robust to small noise)
+        if is_charge:
+            soc_mono = np.maximum.accumulate(soc)      # non-decreasing
+        else:
+            soc_mono = np.minimum.accumulate(soc)      # non-increasing
 
-        # Get max capacity for this cycle (for normalization)
-        max_cap = capacity_monotonic[-1] if len(capacity_monotonic) > 0 else 1.0
+        # Remove near-duplicate SOC points to keep x strictly monotonic for interp
+        ds = np.diff(soc_mono)
+        if is_charge:
+            valid = np.concatenate([[True], ds > 1e-8])
+        else:
+            valid = np.concatenate([[True], ds < -1e-8])
+
+        if valid.sum() < 2:
+            return (
+                self._fast_resample(voltage, target_length),
+                self._fast_resample(current, target_length),
+                self._fast_resample(capacity, target_length),
+                self._fast_resample(soc, target_length),
+            )
+
+        soc_valid = soc_mono[valid]
+        v_valid = voltage[valid]
+        i_valid = current[valid]
+        c_valid = capacity[valid]
+
+        soc_min, soc_max = float(soc_valid.min()), float(soc_valid.max())
+        if is_charge:
+            target_soc = np.linspace(soc_min, soc_max, target_length, dtype=np.float32)
+        else:
+            target_soc = np.linspace(soc_max, soc_min, target_length, dtype=np.float32)
+
+        # np.interp requires increasing x
+        if is_charge:
+            x = soc_valid
+            v = np.interp(target_soc, x, v_valid)
+            i = np.interp(target_soc, x, i_valid)
+            c = np.interp(target_soc, x, c_valid)
+            s = target_soc
+        else:
+            x = soc_valid[::-1]  # increasing
+            v = np.interp(target_soc[::-1], x, v_valid[::-1])[::-1]
+            i = np.interp(target_soc[::-1], x, i_valid[::-1])[::-1]
+            c = np.interp(target_soc[::-1], x, c_valid[::-1])[::-1]
+            s = target_soc
+
+        return (self._sanitize_vector(v),
+                self._sanitize_vector(i),
+                self._sanitize_vector(c),
+                self._sanitize_vector(s))
+
+    def _capacity_based_resample(self, voltage, current, capacity, soc, target_length, is_charge=True):
+        """
+        Capacity-aligned resampling (legacy / non-BatteryMFormer branch).
+        """
+        if len(capacity) == 0 or len(voltage) == 0:
+            z = np.zeros(target_length, dtype=np.float32)
+            return z, z, z, z
+
+        voltage = self._sanitize_vector(voltage)
+        current = self._sanitize_vector(current)
+        capacity = self._sanitize_vector(capacity)
+        soc = self._sanitize_vector(soc)
+
+        capacity_monotonic = np.maximum.accumulate(capacity)
+        max_cap = float(capacity_monotonic[-1]) if len(capacity_monotonic) > 0 else 1.0
         max_cap = max(max_cap, 1e-6)
 
-        # Normalize capacity to [0, 1] relative to this specific cycle
         capacity_norm = capacity_monotonic / max_cap
+        target_norm = np.linspace(0, 1, target_length)
 
-        # Create target points (equally spaced from 0 to 1)
-        target_norm_indices = np.linspace(0, 1, target_length)
-
-        # Find valid indices (strictly increasing capacity)
         valid_mask = np.concatenate([[True], np.diff(capacity_norm) > 1e-8])
-
         if np.sum(valid_mask) < 2:
-            # Fallback to fast resample if capacity data is bad
-            return (self._fast_resample(voltage, target_length),
-                    self._fast_resample(current, target_length),
-                    self._fast_resample(capacity, target_length),
-                    self._fast_resample(soc, target_length))
+            return (
+                self._fast_resample(voltage, target_length),
+                self._fast_resample(current, target_length),
+                self._fast_resample(capacity, target_length),
+                self._fast_resample(soc, target_length),
+            )
 
-        capacity_valid = capacity_norm[valid_mask]
-        voltage_valid = voltage[valid_mask]
-        current_valid = current[valid_mask]
-        soc_valid = soc[valid_mask]
+        x = capacity_norm[valid_mask]
+        v_valid = voltage[valid_mask]
+        i_valid = current[valid_mask]
+        s_valid = soc[valid_mask]
 
-        # Interpolate all variables based on the normalized capacity axis
-        resampled_voltage = np.interp(target_norm_indices, capacity_valid, voltage_valid)
-        resampled_current = np.interp(target_norm_indices, capacity_valid, current_valid)
-        resampled_soc = np.interp(target_norm_indices, capacity_valid, soc_valid)
-        
-        # Capacity is reconstructed from the target indices
-        resampled_capacity = target_norm_indices * max_cap
+        resampled_voltage = np.interp(target_norm, x, v_valid)
+        resampled_current = np.interp(target_norm, x, i_valid)
+        resampled_soc = np.interp(target_norm, x, s_valid)
+        resampled_capacity = target_norm * max_cap
 
         return (self._sanitize_vector(resampled_voltage),
                 self._sanitize_vector(resampled_current),
                 self._sanitize_vector(resampled_capacity),
                 self._sanitize_vector(resampled_soc))
-    
-    def _fast_resample(self, curve, target_length):
-        """Fast resampling using numpy interp"""
-        if len(curve) == 0:
-            return np.zeros(target_length)
-        curve = self._sanitize_vector(curve)
 
-        # Use linear interpolation for speed
-        old_indices = np.linspace(0, len(curve)-1, len(curve))
-        new_indices = np.linspace(0, len(curve)-1, target_length)
-        resampled = np.interp(new_indices, old_indices, curve)
-        return self._sanitize_vector(resampled)
-    
+    def _fast_resample(self, curve, target_length):
+        if len(curve) == 0:
+            return np.zeros(target_length, dtype=np.float32)
+        curve = self._sanitize_vector(curve)
+        old_idx = np.linspace(0, len(curve) - 1, len(curve))
+        new_idx = np.linspace(0, len(curve) - 1, target_length)
+        return self._sanitize_vector(np.interp(new_idx, old_idx, curve))
+
     def _prepare_samples(self):
-        """Prepare all samples for the dataset with optimizations"""
-        # Pre-load embeddings once (instead of loading for each file)
         Qwen3_aging_condition_embeddings = pickle.load(
             open('data_provider/prompt_embeddings/Qwen3_total.pkl', 'rb')
         )
 
         total_life_labels = []
         print('Files:', len(self.files))
+
         for file_name in self.files:
             data = self.read_cell_data_according_to_prefix(file_name)
 
-            # Load full cycle data from cleaned_data
-            if self.dataset_name == 'NA-ion' or self.dataset_name == 'ZN-coin' or self.dataset_name == 'CALB':
+            # dataset dir
+            if self.dataset_name in ['NA-ion', 'ZN-coin', 'CALB']:
                 dataset_dir = file_name.split('_')[0]
             else:
-                dataset_dir = file_name.split('_')[0]
-                dataset_dir = dataset_dir.replace('-', '_')
+                dataset_dir = file_name.split('_')[0].replace('-', '_')
                 if dataset_dir == 'MICH':
                     dataset_dir = 'total_MICH'
                 elif 'Tongji' in file_name:
@@ -607,10 +688,7 @@ class Dataset_SOH_Forecasting(Dataset):
                 print('No file found for:', file_path)
                 continue
 
-            # Try to load SOH from separate processed_SOH directory first
-            soh_dir_root = self.processed_SOH_path
-            soh_file_path = os.path.join(soh_dir_root, dataset_dir, file_name)
-
+            soh_file_path = os.path.join(self.processed_SOH_path, dataset_dir, file_name)
             if os.path.exists(soh_file_path):
                 with open(soh_file_path, 'rb') as f:
                     soh_data = pickle.load(f)
@@ -619,13 +697,8 @@ class Dataset_SOH_Forecasting(Dataset):
                 print('No SOH file found for:', soh_file_path)
                 continue
 
-            # Find EOL index
             eol_threshold = 0.8 if dataset_dir != 'CALB' else 0.9
             eol_cycle = len(soh_trajectory)
-            # # Truncate trajectory if exceeds max_trajectory_len
-            # if eol_cycle > self.max_trajectory_len:
-            #     soh_trajectory = soh_trajectory[:self.max_trajectory_len]
-            #     eol_cycle = self.max_trajectory_len
 
             total_life_labels.append(eol_cycle)
             if eol_cycle <= self.early_cycle_threshold:
@@ -637,52 +710,40 @@ class Dataset_SOH_Forecasting(Dataset):
             if nominal_capacity is None or not np.isfinite(nominal_capacity) or nominal_capacity <= 0:
                 raise Exception(f'{file_name} should have nominal capacity in Ah!')
 
-            # Get embedding for this cell (pre-loaded above)
             aging_condition_embedding_for_this_cell = Qwen3_aging_condition_embeddings[file_name]
-            valid_cycle_number = len(data['cycle_data']) 
-            # Prepare sample based on input mode
+            valid_cycle_number = len(data['cycle_data'])
+
             if self.input_mode == 'current_voltage':
-                # Mode 1: Use current/voltage/capacity/SOC as input
-                # Returns shape: [early_cycles, 4, fixed_len]
                 curves, coulumbic_efficiencys, discharge_efficiencys = self._prepare_charge_discharge_curves(
-                    file_name,
-                    data['cycle_data'], 
-                    nominal_capacity,
-                    start_soc,
-                    end_soc
+                    file_name, data['cycle_data'], nominal_capacity, start_soc, end_soc
                 )
-                
+
                 tmp_soh_trajectory = (soh_trajectory - eol_threshold) / (1.0 - eol_threshold)
 
-                for useable_cycle_number in range(self.seq_len, self.early_cycle_threshold+1):
+                for useable_cycle_number in range(self.seq_len, self.early_cycle_threshold + 1):
                     if useable_cycle_number > valid_cycle_number:
-                        # only effective for some CALB batteries that have only cycling data of 99 cycles available for modeling.
                         break
-                    sample = {
-                    'file_name': file_name,
-                    'nominal_capacity': nominal_capacity
-                    }
+
+                    sample = {'file_name': file_name, 'nominal_capacity': nominal_capacity}
                     sample['cycle_curve_data'] = curves
-                
-                    # Create attention mask for early cycles
+
                     mask = np.ones(self.early_cycle_threshold - self.seq_len + 1)
-                    mask[useable_cycle_number:] = 0 # zero indicates unseen data
+                    mask[useable_cycle_number:] = 0
                     sample['curve_attn_mask'] = mask
 
-                    # Prepare SOH trajectory
                     padded_trajectory = np.zeros(self.max_trajectory_len)
                     trajectory_mask = np.zeros(self.max_trajectory_len)
                     padded_trajectory[:eol_cycle] = tmp_soh_trajectory
-                    trajectory_mask[useable_cycle_number:] = 1 
+                    trajectory_mask[useable_cycle_number:] = 1
                     trajectory_mask[eol_cycle:] = 0
 
                     soh_input = tmp_soh_trajectory[:self.early_cycle_threshold].copy()
-
                     ces = np.zeros(self.early_cycle_threshold)
                     des = np.zeros(self.early_cycle_threshold)
                     ces[:useable_cycle_number] = coulumbic_efficiencys[:useable_cycle_number]
                     des[:useable_cycle_number] = discharge_efficiencys[:useable_cycle_number]
                     soh_input[useable_cycle_number:] = 0
+
                     sample['soh_input'] = soh_input.reshape(-1, 1)
                     sample['CEs'] = ces.reshape(-1, 1)
                     sample['DESs'] = des.reshape(-1, 1)
@@ -690,27 +751,27 @@ class Dataset_SOH_Forecasting(Dataset):
                     sample['trajectory_mask'] = trajectory_mask
                     sample['eol_index'] = eol_cycle
                     sample['aging_condition_embedding'] = aging_condition_embedding_for_this_cell.reshape(1, -1)
-                    
+
                     self.samples.append(sample)
 
             elif self.input_mode == 'soh_to_soh':
-                # Mode 2: Use historical SOH as input
                 tmp_soh_trajectory = (soh_trajectory - eol_threshold) / (1.0 - eol_threshold)
-                for useable_cycle_number in range(self.seq_len, self.early_cycle_threshold+1):
+
+                # NOTE: In your original code, soh_to_soh branch still uses CE/DES, but they are not computed here.
+                # Keep it consistent with your original behavior: if you need CE/DES in this branch, compute curves first.
+                # For now, we set them to zeros.
+                for useable_cycle_number in range(self.seq_len, self.early_cycle_threshold + 1):
                     if useable_cycle_number > valid_cycle_number:
-                        # only effective for some CALB batteries that have only cycling data of 99 cycles available for modeling.
                         break
 
-                    sample = {
-                    'file_name': file_name,
-                    'nominal_capacity': nominal_capacity
-                    }
+                    sample = {'file_name': file_name, 'nominal_capacity': nominal_capacity}
+
                     soh_input = tmp_soh_trajectory[:self.early_cycle_threshold].copy()
                     soh_input[useable_cycle_number:] = 0
+
                     ces = np.zeros(self.early_cycle_threshold)
                     des = np.zeros(self.early_cycle_threshold)
-                    ces[:useable_cycle_number] = coulumbic_efficiencys[:useable_cycle_number]
-                    des[:useable_cycle_number] = discharge_efficiencys[:useable_cycle_number]
+
                     sample['CEs'] = ces.reshape(-1, 1)
                     sample['DESs'] = des.reshape(-1, 1)
                     sample['soh_input'] = soh_input.reshape(-1, 1)
@@ -720,40 +781,31 @@ class Dataset_SOH_Forecasting(Dataset):
                     padded_trajectory[:eol_cycle] = tmp_soh_trajectory
                     trajectory_mask[useable_cycle_number:] = 1
                     trajectory_mask[eol_cycle:] = 0
+
                     sample['soh_trajectory'] = padded_trajectory
                     sample['trajectory_mask'] = trajectory_mask
                     sample['eol_index'] = eol_cycle
                     sample['aging_condition_embedding'] = aging_condition_embedding_for_this_cell.reshape(1, -1)
+
                     self.samples.append(sample)
-            
+
             elif self.input_mode == 'capacity_increment':
-                # Mode 3: Use charge capacity increment curves as input
                 curves, coulumbic_efficiencys, discharge_efficiencys = self._prepare_charge_discharge_curves(
-                    file_name,
-                    data['cycle_data'], 
-                    nominal_capacity,
-                    start_soc,
-                    end_soc
+                    file_name, data['cycle_data'], nominal_capacity, start_soc, end_soc
                 )
 
                 tmp_soh_trajectory = (soh_trajectory - 0.8) / (1.0 - 0.8)
-                for useable_cycle_number in range(self.seq_len, self.early_cycle_threshold+1):
+                for useable_cycle_number in range(self.seq_len, self.early_cycle_threshold + 1):
                     if useable_cycle_number > valid_cycle_number:
-                        # only effective for some CALB batteries that have only cycling data of 99 cycles available for modeling.
                         break
 
-                    sample = {
-                    'file_name': file_name,
-                    'nominal_capacity': nominal_capacity
-                    }
+                    sample = {'file_name': file_name, 'nominal_capacity': nominal_capacity}
                     sample['cycle_curve_data'] = curves
-                
-                    # Create attention mask for early cycles
+
                     mask = np.ones(self.early_cycle_threshold - self.seq_len + 1)
-                    mask[useable_cycle_number:] = 0 # zero indicates unseen data
+                    mask[useable_cycle_number:] = 0
                     sample['curve_attn_mask'] = mask
 
-                    # Prepare SOH trajectory
                     padded_trajectory = np.zeros(self.max_trajectory_len)
                     trajectory_mask = np.zeros(self.max_trajectory_len)
                     padded_trajectory[:eol_cycle] = tmp_soh_trajectory
@@ -761,23 +813,25 @@ class Dataset_SOH_Forecasting(Dataset):
                     trajectory_mask[eol_cycle:] = 0
 
                     soh_input = tmp_soh_trajectory[:self.early_cycle_threshold].copy()
-
                     soh_input[useable_cycle_number:] = 0
+
                     sample['soh_input'] = soh_input.reshape(-1, 1)
                     sample['soh_trajectory'] = padded_trajectory
                     sample['trajectory_mask'] = trajectory_mask
                     sample['rul_index'] = eol_cycle - useable_cycle_number
 
                     self.samples.append(sample)
+            else:
+                raise ValueError(f"Unsupported input_mode: {self.input_mode}")
 
-        
+        # Label scaling
         if self.label_scaler is None:
             if self.input_mode != 'capacity_increment':
                 scaler = StandardScaler()
                 self.label_scaler = scaler.fit(np.array(total_life_labels).reshape(-1, 1))
                 mean = self.label_scaler.mean_
                 std = np.sqrt(self.label_scaler.var_)
-                for i, sample in enumerate(self.samples):
+                for sample in self.samples:
                     sample['eol_index'] = (sample['eol_index'] - mean[0]) / std[0]
         else:
             if self.input_mode != 'capacity_increment':
@@ -786,7 +840,7 @@ class Dataset_SOH_Forecasting(Dataset):
 
     def __len__(self):
         return len(self.samples)
-    
+
     def __getitem__(self, index):
         sample = self.samples[index]
 
@@ -832,11 +886,24 @@ class Dataset_SOH_Forecasting(Dataset):
 
 class Dataset_SOH_to_SOH(Dataset_SOH_Forecasting):
     """Specialized dataset for SOH-to-SOH prediction"""
-    def __init__(self, args, flag='train', max_trajectory_len=5200):
-        super().__init__(args, flag, input_mode='soh_to_soh', max_trajectory_len=max_trajectory_len)
+    def __init__(self, args, flag='train', max_trajectory_len=5200, alignment_check: bool = False):
+        super().__init__(
+            args,
+            flag=flag,
+            input_mode='soh_to_soh',
+            max_trajectory_len=max_trajectory_len,
+            alignment_check=alignment_check,
+        )
 
-# the dataloader for IC2ML model
+
 class Dataset_IC2ML(Dataset_SOH_Forecasting):
-    """Specialized dataset for SOH-to-SOH prediction"""
-    def __init__(self, args, flag='train', max_trajectory_len=5200, label_scaler=None):
-        super().__init__(args, flag, input_mode='capacity_increment', max_trajectory_len=max_trajectory_len, label_scaler=label_scaler)
+    """Specialized dataset for IC2ML"""
+    def __init__(self, args, flag='train', max_trajectory_len=5200, label_scaler=None, alignment_check: bool = False):
+        super().__init__(
+            args,
+            flag=flag,
+            input_mode='capacity_increment',
+            max_trajectory_len=max_trajectory_len,
+            label_scaler=label_scaler,
+            alignment_check=alignment_check,
+        )
