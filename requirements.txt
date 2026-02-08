@@ -1,26 +1,17 @@
-# Core deep learning
 torch==2.8.0
 numpy==1.26.4
 scipy==1.13.1
 einops==0.8.1
-
-# Data processing
 pandas==2.3.3
 scikit-learn==1.6.1
 joblib==1.5.3
 h5py==3.14.0
-
-# Visualization
 matplotlib==3.9.4
 seaborn==0.13.2
 tqdm==4.67.1
-
-# Model components
 reformer-pytorch==1.4.4
 PyWavelets==1.6.0
 safetensors==0.7.0
-
-# Training utilities
 accelerate==1.10.1
 optuna==4.6.0
 wandb==0.23.1
