@@ -45,7 +45,6 @@ Thumbs.db
 # =========================
 # Data / artifacts
 # =========================
-*.pkl
 *.pkl.backup
 *.pickle
 *.h5
