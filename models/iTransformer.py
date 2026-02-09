@@ -1,13 +1,3 @@
-"""
-iTransformer for SOH Trajectory Forecasting
-Paper link: https://arxiv.org/abs/2310.06625
-
-Architecture follows BatteryLife implementation:
-- Inverted embedding: each variable as a token
-- Flatten all variable embeddings and project to output
-- No input-to-output denormalization (input and output are different quantities)
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,15 +7,7 @@ from layers.Embed import DataEmbedding_inverted
 
 
 class Model(nn.Module):
-    """
-    iTransformer for SOH trajectory forecasting
-
-    Key design (following BatteryLife):
-    - Inverted Transformer: treats each variable as a token
-    - Flatten + Linear projection for output (not mean)
-    - No denormalization from input stats to output
-    """
-
+    
     def __init__(self, configs):
         super(Model, self).__init__()
         self.configs = configs

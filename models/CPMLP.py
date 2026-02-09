@@ -1,10 +1,3 @@
-"""
-CPMLP for SOH Trajectory Forecasting
-Supports two input modes:
-1. SOH to SOH: Input historical SOH, predict future SOH trajectory
-2. Current/Voltage to SOH: Input charge/discharge curves, predict SOH trajectory
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

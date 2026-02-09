@@ -5,11 +5,6 @@ from layers.Autoformer_EncDec import series_decomp
 
 
 class Model(nn.Module):
-    """
-    DLinear for SOH trajectory forecasting
-    Paper link: https://arxiv.org/pdf/2205.13504.pdf
-    Modified to support both current/voltage input and SOH-to-SOH prediction
-    """
 
     def __init__(self, configs, individual=False):
         """
