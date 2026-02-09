@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# ==========================================
-# 1. Hardware & Environment Setup
-# ==========================================
 # 指定使用的GPU编号 (例如: "0" 或 "0,1")
 gpu_ids=0
 # 指定使用的GPU数量
@@ -11,19 +8,11 @@ num_process=1
 master_port=19520
 seed=2021
 
-# ==========================================
-# 2. Pretrained Model & Target Dataset
-# ==========================================
-# 预训练模型路径 (包含 args.json, checkpoint, label_scaler)
 pretrained_path="./checkpoints/CPTransformer_Li_ion_current_voltage"
 
 # 微调目标数据集
 finetune_dataset=CALB
 
-# ==========================================
-# 3. Fine-tuning Hyperparameters
-# ==========================================
-# 微调学习率 (建议: 预训练学习率的 1/10 ~ 1/5)
 finetune_lr=0.00001
 
 # 微调轮数
@@ -41,25 +30,11 @@ weight_decay=0.01
 # 梯度裁剪
 grad_clip=1.0
 
-# ==========================================
-# 4. Parameter Freezing Strategy
-# ==========================================
-# 冻结模式: none / encoder / all_but_head / custom
-# - none: 全量微调 (所有参数可训练)
-# - encoder: 冻结特征提取层，只训练输出头
-# - all_but_head: 冻结除输出层外的所有层
-# - custom: 自定义冻结层 (需配合 freeze_layers)
 freeze_mode=none
-
-# 自定义冻结层 (freeze_mode=custom 时使用，逗号分隔)
-# freeze_layers="intra_embed,encoder"
 
 # 渐进解冻: N 轮后解冻所有参数 (0 = 不解冻)
 unfreeze_after_epochs=0
 
-# ==========================================
-# 5. Learning Rate Scheduling
-# ==========================================
 # 学习率调度: constant / cosine / warmup_cosine
 lradj=warmup_cosine
 
@@ -87,7 +62,6 @@ echo "Freeze mode:       $freeze_mode"
 echo "GPU:               $gpu_ids"
 echo "=========================================="
 
-# 构建命令
 CMD="CUDA_VISIBLE_DEVICES=$gpu_ids accelerate launch \
   --mixed_precision fp16 \
   --num_processes $num_process \
@@ -107,7 +81,6 @@ CMD="CUDA_VISIBLE_DEVICES=$gpu_ids accelerate launch \
   --seed $seed \
   --use_amp"
 
-# 添加渐进解冻参数
 if [ "$unfreeze_after_epochs" -gt 0 ]; then
   CMD="$CMD --unfreeze_after_epochs $unfreeze_after_epochs"
 fi

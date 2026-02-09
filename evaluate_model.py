@@ -9,7 +9,7 @@ from collections import defaultdict
 from accelerate import Accelerator, load_checkpoint_in_model
 from accelerate.utils import set_seed as accelerate_set_seed
 from data_provider.data_factory import data_provider_soh
-from models import PatchTST, iTransformer, DLinear, CPTransformer, CPMLP, MultiPatchFormer, BatteryMFormer
+from models import PatchTST, iTransformer, DLinear, CPTransformer, CPMLP, BatteryMFormer
 from models import TimeMixerPP, IC2ML, PatchMLP
 from models import ConvTimeNet
 import warnings
@@ -39,7 +39,6 @@ def get_model(args):
         'CPMLP': CPMLP,
         'TimeMixerPP': TimeMixerPP,
         'PatchMLP': PatchMLP,
-        'MultiPatchFormer': MultiPatchFormer,
         'BatteryMFormer': BatteryMFormer,
         'IC2ML': IC2ML,
         'ConvTimeNet': ConvTimeNet
@@ -341,6 +340,14 @@ def main():
         args_dict = json.load(f)
 
     args = argparse.Namespace(**args_dict)
+
+    # Normalize legacy model names to current names
+    _MODEL_ALIASES = {
+        'BatteryMFormer_Trial2': 'BatteryMFormer',
+    }
+    if args.model in _MODEL_ALIASES:
+        args.model = _MODEL_ALIASES[args.model]
+
     set_seed(args.seed)
 
     original_train_dataset = args.dataset
