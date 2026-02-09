@@ -43,7 +43,7 @@ echo "Input directory (cleaned_data): $INPUT_DIR"
 echo "Intermediate SOH directory:     $SOH_DIR"
 echo "Output directory (processed):   $OUTPUT_DIR"
 echo "Python command:                 $PYTHON_CMD"
-echo "ISU_ILCC raw data directory:    ${ISU_ILCC_RAW_DIR:-'(not specified)'}"
+echo "ISU_ILCC raw data directory:    ${ISU_ILCC_RAW_DIR:-(not specified)}"
 echo "Time normalization:             $TIME_NORMALIZE"
 echo "========================================"
 
