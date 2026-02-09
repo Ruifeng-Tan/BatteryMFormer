@@ -1,40 +1,57 @@
 #!/bin/bash
-# TimesFM Baseline Evaluation Script
-# TimesFM is a pretrained foundation model - no training needed, just evaluation
 
-cd "$(dirname "$0")/.." || exit 1
+# TimesFM Baseline Evaluation
+# TimesFM is a pretrained time-series foundation model from Google Research.
+# It is evaluation-only (no training needed).
+#
+# Setup (one-time):
+#   1. Clone the TimesFM repo and install:
+#        git clone https://github.com/google-research/timesfm.git
+#        pip install -e "./timesfm[torch]"
+#   2. The model weights (google/timesfm-2.5-200m-pytorch) will be
+#      auto-downloaded from HuggingFace on first run.
+#      If you have network issues, set the HF mirror:
+#        export HF_ENDPOINT=https://hf-mirror.com
+#   3. Prepare cached data by running training first (see train_BattMFormer.sh),
+#      which generates cache files under cache_root.
 
-# Use GPU 1 (or change to available GPU)
-GPU=${3:-1}
+gpu=0
 
+# ==========================================
+# 2. Dataset & Evaluation Configuration
+# ==========================================
 # Dataset to evaluate (Li_ion, CALB, NA-ion, ZN-coin)
-DATASET=${1:-Li_ion}
-SEED=${2:-2024}
+dataset=Li_ion
+seed=2024
 
-# Must match the cache file parameters
-EARLY_CYCLE_THRESHOLD=100
-CHARGE_DISCHARGE_LENGTH=300
-SEQ_LEN=1
-MAX_TRAJECTORY_LEN=5000
+# ==========================================
+# 3. Data Parameters (must match cached data)
+# ==========================================
+early_cycle_threshold=100
+charge_discharge_length=300
+seq_len=1
+max_trajectory_len=5000
+batch_size=32
 
-echo "========================================="
-echo "TimesFM Baseline Evaluation"
-echo "Dataset: ${DATASET}"
-echo "Seed: ${SEED}"
-echo "========================================="
+# ==========================================
+# 4. Paths
+# ==========================================
+cache_root=/path/to/your/cache
+output_dir=./results/timesfm
 
+# ==========================================
+# 5. Execution Command
+# ==========================================
 python train_eval_scripts/eval_timesfm.py \
-    --dataset $DATASET \
-    --seed $SEED \
+    --dataset $dataset \
+    --seed $seed \
     --flag test \
-    --early_cycle_threshold $EARLY_CYCLE_THRESHOLD \
-    --charge_discharge_length $CHARGE_DISCHARGE_LENGTH \
-    --seq_len $SEQ_LEN \
-    --max_trajectory_len $MAX_TRAJECTORY_LEN \
+    --early_cycle_threshold $early_cycle_threshold \
+    --charge_discharge_length $charge_discharge_length \
+    --seq_len $seq_len \
+    --max_trajectory_len $max_trajectory_len \
     --use_capacity_resample \
-    --batch_size 32 \
-    --gpu $GPU \
-    --output_dir ./results/timesfm
-
-echo ""
-echo "Evaluation completed!"
+    --batch_size $batch_size \
+    --gpu $gpu \
+    --cache_root $cache_root \
+    --output_dir $output_dir
