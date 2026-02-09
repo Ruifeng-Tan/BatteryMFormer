@@ -11,12 +11,7 @@ Based on RWTH dataset analysis:
 - Very high data quality (98.96% normal)
 - Main anomalies: Characterization tests (SOH increases/decreases)
 - Time gaps: ~2h during tests
-- Allow SOH > 1.0 (possible capacity recovery)
 
-Key differences from MICH:
-- No clip on SOH > 1.0 (preserve original behavior)
-- No extreme threshold (use statistical thresholds only)
-- Use original SOH for anchor points (avoid bug)
 """
 
 import pickle

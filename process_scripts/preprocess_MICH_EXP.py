@@ -8,8 +8,6 @@ Features:
 4. Save processed data to processed_SOH directory
 
 Based on preprocess_HNEI.py with MICH_EXP-specific thresholds
-Data quality: Extremely high (99.53% normal)
-Main issues: Large SOH drops in -5°C conditions
 """
 
 import pickle

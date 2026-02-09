@@ -17,8 +17,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 warnings.filterwarnings('ignore')
-
-
 def collate_fn_soh(samples):
     """
     Custom collate function for SOH trajectory prediction
@@ -93,7 +91,7 @@ class Dataset_SOH_Forecasting(Dataset):
         input_mode='current_voltage',
         max_trajectory_len=5200,
         label_scaler=None,
-        alignment_check: bool = False,
+        alignment_check: bool = True,
     ):
         """
         Dataset for SOH trajectory prediction with caching.
@@ -225,7 +223,7 @@ class Dataset_SOH_Forecasting(Dataset):
                 split_json = f'./data_provider/split_json/fewshot/{self.dataset_name}_split_{self.random_seed}_fewshot{fewshot_pct}.json'
             else:
                 split_json = f'./data_provider/split_json/fewshot/total_split_{self.random_seed}_fewshot{fewshot_pct}.json'
-            print(f"Using fewshot split: {split_json}")
+            print(f"Using data-efficient split: {split_json}")
         else:
             if self.dataset_name != 'Li_ion':
                 split_json = f'./data_provider/split_json/{self.dataset_name}_split_{self.random_seed}.json'
@@ -319,6 +317,29 @@ class Dataset_SOH_Forecasting(Dataset):
                 f"discharge_send={float(discharge_s[-1]):.4f}, expected~{low:.4f}"
             )
 
+    @staticmethod
+    def _first_contiguous_block_last_index(idxs: np.ndarray) -> int:
+        """
+        Given sorted indices array (1D), return the last index of the first
+        contiguous block. Contiguous means successive indices differ by 1.
+
+        Example:
+            idxs = [5,6,7, 10,11] -> returns 7
+            idxs = [3,4,5] -> returns 5
+        """
+        if idxs.size == 0:
+            return -1
+        if idxs.size == 1:
+            return int(idxs[0])
+
+        diffs = np.diff(idxs)
+        breaks = np.where(diffs > 1)[0]   # positions where continuity breaks
+        if breaks.size == 0:
+            return int(idxs[-1])          # fully contiguous
+        # first break at position breaks[0], so first block ends at idxs[breaks[0]]
+        return int(idxs[breaks[0]])
+
+
     def _prepare_charge_discharge_curves(self, file_name, cycle_data, nominal_capacity, start_soc, end_soc):
         """
         Prepare charge/discharge curves including SOC calculation.
@@ -378,7 +399,10 @@ class Dataset_SOH_Forecasting(Dataset):
                         curves.append(curve.reshape(1, 4, self.charge_discharge_len))
                     continue
 
-                charge_end_index = cutoff_charge[0][-1]
+                if 'MATR_b1c18' in file_name:
+                    charge_end_index = cutoff_discharge[0][0] - 1
+                else:
+                    charge_end_index = cutoff_charge[0][-1]
                 discharge_end_index = cutoff_discharge[0][-1]
 
                 if prefix in ['RWTH', 'CALB_0', 'CALB_25', 'CALB_45'] or (

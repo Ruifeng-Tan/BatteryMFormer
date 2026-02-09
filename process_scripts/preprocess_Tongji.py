@@ -6,8 +6,6 @@ Simple processing logic:
 - Use interpolation to smooth the region
 - Record all problematic cycles
 
-FIXED: Previous version had "avalanche effect" where continuous replacement
-led to flat lines. Now uses region detection instead of single-point replacement.
 """
 
 import pickle

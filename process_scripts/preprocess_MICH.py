@@ -9,8 +9,6 @@ Features:
 5. Save processed data to processed_SOH directory
 
 Based on preprocess_HNEI.py with MICH-specific thresholds and special cycle detection
-Data quality: Medium (95.02% normal)
-Main issues: Cycle 444 extreme anomalies (Formation test), EOL zero values
 """
 
 import pickle
@@ -65,9 +63,6 @@ def find_stable_point(soh: np.ndarray, relative_changes: np.ndarray, start_idx: 
     Returns:
         Index where SOH has stabilized (either recovered or reached new stable level)
 
-    Note:
-        - Has MAX_ANOMALY_LENGTH limit to prevent excessive interpolation
-        - If anomaly region exceeds limit, returns limit to avoid "avalanche effect"
     """
     i = start_idx + 1
 
