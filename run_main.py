@@ -15,7 +15,7 @@ from accelerate.utils import set_seed as accelerate_set_seed
 from data_provider.data_factory import data_provider_soh
 from utils.tools import EarlyStopping
 import joblib
-from models import PatchTST, iTransformer, DLinear, Autoformer, CPTransformer, CPMLP, BatteryMFormer
+from models import PatchTST, iTransformer, DLinear, CPTransformer, CPMLP, BatteryMFormer
 from models import TimeMixerPP, IC2ML, PatchMLP
 from models import ConvTimeNet
 import warnings
@@ -65,7 +65,6 @@ def get_model(args):
         'PatchTST': PatchTST,
         'iTransformer': iTransformer,
         'DLinear': DLinear,
-        'Autoformer': Autoformer,
         'CPTransformer': CPTransformer,
         'CPMLP': CPMLP,
         'TimeMixerPP': TimeMixerPP,

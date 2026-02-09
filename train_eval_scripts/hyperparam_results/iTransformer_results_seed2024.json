@@ -1,0 +1,184 @@
+{
+  "model": "iTransformer",
+  "seed": 2024,
+  "n_trials": 10,
+  "best_value": Infinity,
+  "best_params": {
+    "learning_rate": 9.977437815463029e-05,
+    "d_model": 64,
+    "n_heads": 8,
+    "e_layers": 6,
+    "dropout": 0.25,
+    "batch_size": 512,
+    "weight_decay": 0.006417200623492833,
+    "d_ff": 128
+  },
+  "elapsed_time": 3036.20565700531,
+  "all_trials": [
+    {
+      "number": 0,
+      "value": null,
+      "params": {
+        "learning_rate": 9.977437815463029e-05,
+        "d_model": 64,
+        "n_heads": 8,
+        "e_layers": 6,
+        "dropout": 0.25,
+        "batch_size": 512,
+        "weight_decay": 0.006417200623492833,
+        "d_ff": 128
+      },
+      "state": "TrialState.FAIL"
+    },
+    {
+      "number": 1,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 9.977437815463029e-05,
+        "d_model": 64,
+        "n_heads": 8,
+        "e_layers": 6,
+        "dropout": 0.25,
+        "batch_size": 512,
+        "weight_decay": 0.006417200623492833,
+        "d_ff": 128
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 2,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 5.795549392849036e-05,
+        "d_model": 256,
+        "n_heads": 8,
+        "e_layers": 3,
+        "dropout": 0.15000000000000002,
+        "batch_size": 256,
+        "weight_decay": 0.0014064454484986662,
+        "d_ff": 512
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 3,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 2.5470147484096572e-05,
+        "d_model": 128,
+        "n_heads": 2,
+        "e_layers": 3,
+        "dropout": 0.2,
+        "batch_size": 512,
+        "weight_decay": 0.047583804111941935,
+        "d_ff": 512
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 4,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 2.7214601909223168e-05,
+        "d_model": 64,
+        "n_heads": 4,
+        "e_layers": 2,
+        "dropout": 0.4,
+        "batch_size": 512,
+        "weight_decay": 0.00109751865543426,
+        "d_ff": 512
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 5,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00014107590831583035,
+        "d_model": 256,
+        "n_heads": 2,
+        "e_layers": 7,
+        "dropout": 0.2,
+        "batch_size": 512,
+        "weight_decay": 0.0004609820007102715,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 6,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 7.060635428999606e-05,
+        "d_model": 128,
+        "n_heads": 2,
+        "e_layers": 4,
+        "dropout": 0.35,
+        "batch_size": 512,
+        "weight_decay": 0.031149176546078686,
+        "d_ff": 512
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 7,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.000303882581522162,
+        "d_model": 128,
+        "n_heads": 4,
+        "e_layers": 8,
+        "dropout": 0.35,
+        "batch_size": 256,
+        "weight_decay": 0.0070780070071246315,
+        "d_ff": 512
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 8,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00039497123698575023,
+        "d_model": 128,
+        "n_heads": 2,
+        "e_layers": 3,
+        "dropout": 0.4,
+        "batch_size": 512,
+        "weight_decay": 0.0067196533782579535,
+        "d_ff": 512
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 9,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 3.130640738793575e-05,
+        "d_model": 256,
+        "n_heads": 8,
+        "e_layers": 8,
+        "dropout": 0.4,
+        "batch_size": 256,
+        "weight_decay": 0.04996174937698256,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 10,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00011983754691151264,
+        "d_model": 64,
+        "n_heads": 2,
+        "e_layers": 8,
+        "dropout": 0.2,
+        "batch_size": 128,
+        "weight_decay": 0.001684093297876821,
+        "d_ff": 256
+      },
+      "state": "TrialState.COMPLETE"
+    }
+  ]
+}

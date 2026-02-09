@@ -1,0 +1,83 @@
+{
+  "model": "PatchMLP",
+  "seed": 2024,
+  "study_suffix": "A",
+  "n_trials": 5,
+  "best_value": Infinity,
+  "best_params": {
+    "learning_rate": 0.00012689473214550843,
+    "d_model": 256,
+    "e_layers": 3,
+    "dropout": 0.25,
+    "batch_size": 256,
+    "weight_decay": 0.038121654911775694
+  },
+  "elapsed_time": 23350.594156503677,
+  "all_trials": [
+    {
+      "number": 0,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00012689473214550843,
+        "d_model": 256,
+        "e_layers": 3,
+        "dropout": 0.25,
+        "batch_size": 256,
+        "weight_decay": 0.038121654911775694
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 1,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 0.00018725420415443666,
+        "d_model": 512,
+        "e_layers": 6,
+        "dropout": 0.25,
+        "batch_size": 512,
+        "weight_decay": 0.007745726481724162
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 2,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 2.207180905403453e-05,
+        "d_model": 128,
+        "e_layers": 5,
+        "dropout": 0.05,
+        "batch_size": 256,
+        "weight_decay": 0.00046809092214771414
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 3,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 7.509122444457754e-05,
+        "d_model": 512,
+        "e_layers": 6,
+        "dropout": 0.3,
+        "batch_size": 256,
+        "weight_decay": 0.004540374548277408
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 4,
+      "value": Infinity,
+      "params": {
+        "learning_rate": 3.9427708347011533e-05,
+        "d_model": 512,
+        "e_layers": 5,
+        "dropout": 0.15000000000000002,
+        "batch_size": 512,
+        "weight_decay": 0.027091138756966192
+      },
+      "state": "TrialState.COMPLETE"
+    }
+  ]
+}

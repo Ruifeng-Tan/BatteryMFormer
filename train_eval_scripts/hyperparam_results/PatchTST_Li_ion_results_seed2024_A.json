@@ -1,0 +1,181 @@
+{
+  "model": "PatchTST",
+  "dataset": "Li_ion",
+  "seed": 2024,
+  "n_trials": 10,
+  "best_val_mape": 2.5345329195261,
+  "best_params": {
+    "d_model": 128,
+    "learning_rate": 0.00017783316603488548,
+    "e_layers": 3,
+    "d_ff": 512,
+    "patch_len": 600,
+    "dropout": 0.2,
+    "batch_size": 128,
+    "weight_decay": 0.0006607229355487142,
+    "n_heads": 2
+  },
+  "elapsed_time": 49886.40227794647,
+  "all_trials": [
+    {
+      "number": 0,
+      "value": 2.6971185579895973,
+      "params": {
+        "d_model": 256,
+        "n_heads_d256": 8,
+        "learning_rate": 1.1075884901290757e-05,
+        "e_layers": 3,
+        "d_ff": 128,
+        "patch_len": 600,
+        "dropout": 0.1,
+        "batch_size": 256,
+        "weight_decay": 0.0010553217727956505
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 1,
+      "value": 2.570384368300438,
+      "params": {
+        "d_model": 256,
+        "n_heads_d256": 8,
+        "learning_rate": 8.765795909450454e-05,
+        "e_layers": 2,
+        "d_ff": 256,
+        "patch_len": 150,
+        "dropout": 0.15000000000000002,
+        "batch_size": 256,
+        "weight_decay": 0.009013012769581642
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 2,
+      "value": 2.6869671419262886,
+      "params": {
+        "d_model": 128,
+        "n_heads_d128": 4,
+        "learning_rate": 9.296971717254083e-05,
+        "e_layers": 4,
+        "d_ff": 512,
+        "patch_len": 600,
+        "dropout": 0.25,
+        "batch_size": 256,
+        "weight_decay": 0.025255743774438857
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 3,
+      "value": 2.8993964195251465,
+      "params": {
+        "d_model": 64,
+        "n_heads_d64": 2,
+        "learning_rate": 8.601224793548858e-05,
+        "e_layers": 2,
+        "d_ff": 512,
+        "patch_len": 600,
+        "dropout": 0.3,
+        "batch_size": 128,
+        "weight_decay": 0.00030846764775879093
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 4,
+      "value": 2.5345329195261,
+      "params": {
+        "d_model": 128,
+        "n_heads_d128": 2,
+        "learning_rate": 0.00017783316603488548,
+        "e_layers": 3,
+        "d_ff": 512,
+        "patch_len": 600,
+        "dropout": 0.2,
+        "batch_size": 128,
+        "weight_decay": 0.0006607229355487142
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 5,
+      "value": 2.6084406301379204,
+      "params": {
+        "d_model": 256,
+        "n_heads_d256": 8,
+        "learning_rate": 0.00010338882118669789,
+        "e_layers": 3,
+        "d_ff": 512,
+        "patch_len": 150,
+        "dropout": 0.25,
+        "batch_size": 128,
+        "weight_decay": 0.00021923375644128176
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 6,
+      "value": 3.171638771891594,
+      "params": {
+        "d_model": 64,
+        "n_heads_d64": 2,
+        "learning_rate": 1.147989625828975e-05,
+        "e_layers": 4,
+        "d_ff": 128,
+        "patch_len": 300,
+        "dropout": 0.25,
+        "batch_size": 128,
+        "weight_decay": 0.0010904031016899462
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 7,
+      "value": 2.789522148668766,
+      "params": {
+        "d_model": 256,
+        "n_heads_d256": 4,
+        "learning_rate": 7.216206535716562e-05,
+        "e_layers": 5,
+        "d_ff": 128,
+        "patch_len": 150,
+        "dropout": 0.25,
+        "batch_size": 256,
+        "weight_decay": 0.0074833301902057
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 8,
+      "value": 2.716539055109024,
+      "params": {
+        "d_model": 128,
+        "n_heads_d128": 8,
+        "learning_rate": 4.424793819109258e-05,
+        "e_layers": 3,
+        "d_ff": 256,
+        "patch_len": 150,
+        "dropout": 0.25,
+        "batch_size": 256,
+        "weight_decay": 0.09184548247112641
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 9,
+      "value": 3.0304478481411934,
+      "params": {
+        "d_model": 64,
+        "n_heads_d64": 4,
+        "learning_rate": 3.214699806528591e-05,
+        "e_layers": 3,
+        "d_ff": 512,
+        "patch_len": 150,
+        "dropout": 0.3,
+        "batch_size": 256,
+        "weight_decay": 0.0014944254330120376
+      },
+      "state": "TrialState.COMPLETE"
+    }
+  ]
+}
