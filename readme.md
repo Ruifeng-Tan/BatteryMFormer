@@ -1,4 +1,45 @@
 # BatteryMFormer
-This is the official repository for BatteryMFormer: Multi-level Learning for Battery Degradation Trajectory Forecasting. If you find this repository useful, we would appreciate citations to our paper and stars to this repository.
 
+This is the official repository for "BatteryMFormer: Multi-level Learning for Battery Degradation Trajectory Forecasting." If you find this repository useful, we would appreciate citations to our paper and stars to this repository.
+
+# Requirements
+Please install the required packages listed in the `requirements.txt` file:
+```
+pip install -r requirements.txt
+```
+
+# Data availability 
+
+Please directly download the .pkl files from [version v9 BatteryLife data](https://zenodo.org/records/17958489) for later data processing. The ISU_ILCC dataset is downloadable at [ISU_ILCC dataset](https://iastate.figshare.com/articles/dataset/_b_ISU-ILCC_Battery_Aging_Dataset_b_/22582234).
+
+
+# Quick start
+
+## Data preprocessing
+
+After downloading BatteryLife (v9) and ISU_ILCC data, run:
+
+```
+bash process_scripts/run_soh_pipeline.sh
+```
+Note that you should revise the args like `CALB_capacity_file_path` and `INPUT_DIR` in the script before running. The OUTPUT_DIR should be consistent with the processed_SOH_path in the training scripts
+
+To skip this step, you can also download the processed data from [link](https://huggingface.co/datasets/JintaoDong256/BatteryMFormer) .
+
+## Training
+
+You can run the following command to train the model:
+
+```
+sh train_eval_scripts/train_BattMFormer.sh
+Tip: set random seeds and hyperparameters consistently if you plan to reproduce results in our paper.
+```
+
+## Evaluation
+
+To obtain detailed test-set results (e.g., performance vs. increasing usable cycle number):
+
+```
+sh train_eval_scripts/evaluate_model.sh
+```
 
