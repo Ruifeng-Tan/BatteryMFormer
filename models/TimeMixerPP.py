@@ -12,11 +12,6 @@ from layers.StandardNorm import Normalize
 
 
 def FFT_for_Period(x, k=2):
-    """
-    Adaptive period detection via FFT (Core component of TimeMixer++)
-    Finds top-k dominant periods in the input sequence
-    """
-    # Convert to FP32 for FFT (cuFFT requires power-of-2 dimensions for FP16)
     original_dtype = x.dtype
     x_fp32 = x.float()
     xf = torch.fft.rfft(x_fp32, dim=1)
@@ -266,8 +261,6 @@ class Model(nn.Module):
     - Multi-Scale Cross Mixing
     - Multi-Resolution Aggregation
 
-    Domain adaptation:
-    - CycleEncoder for battery charge/discharge curves (input layer only)
     """
     def __init__(self, configs):
         super(Model, self).__init__()
