@@ -18,15 +18,6 @@ class Transpose(nn.Module):
 
 
 class Model(nn.Module):
-    """
-    PatchTST for SOH trajectory forecasting
-    Modified to support both current/voltage input and SOH-to-SOH prediction
-
-    Input format:
-    - current_voltage mode: cycle_curve_data [B, num_cycles, num_vars, curve_len]
-      where num_cycles = early_cycle_threshold - seq_len + 1
-    - soh_to_soh mode: soh_input [B, early_cycle_threshold, 1]
-    """
 
     def __init__(self, configs):
         super().__init__()

@@ -1,18 +1,3 @@
-"""
-TimeMixer++ for SOH Trajectory Forecasting
-
-Paper: TimeMixer++: A General Time Series Pattern Machine for Universal Predictive Analysis
-Reference: https://arxiv.org/abs/2410.16032
-
-This implementation preserves the COMPLETE original TimeMixer++ architecture:
-- FFT_for_Period: Adaptive period detection via FFT
-- Time Imaging: Reshape 1D series to 2D based on detected periods
-- Dual-Axis Attention: Row attention (trend) + Column attention (season)
-- Multi-Scale Mixing: Cross-scale information fusion
-- Multi-Resolution Mixing: Aggregate multiple period patterns
-
-"""
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -25,9 +10,6 @@ from layers.SelfAttention_Family import FullAttention, AttentionLayer
 from layers.StandardNorm import Normalize
 
 
-# =============================================================================
-# Core TimeMixer++ Components (Preserved from original paper)
-# =============================================================================
 
 def FFT_for_Period(x, k=2):
     """
@@ -228,18 +210,8 @@ class MixerBlock(nn.Module):
         return res
 
 
-# =============================================================================
-# Domain Adaptation Layer for Battery SOH Task
-# =============================================================================
 
 class CycleEncoder(nn.Module):
-    """
-    Encode each cycle's charge/discharge curve into a fixed-dim vector.
-    This is a standard domain adaptation approach (similar to patch embedding).
-
-    Input: [B, num_cycles, num_vars, curve_len]
-    Output: [B, num_cycles, d_model]
-    """
     def __init__(self, num_vars, curve_len, d_model, dropout=0.1):
         super(CycleEncoder, self).__init__()
         self.num_vars = num_vars
@@ -282,9 +254,6 @@ class CycleEncoder(nn.Module):
         return cycle_features
 
 
-# =============================================================================
-# Main Model
-# =============================================================================
 
 class Model(nn.Module):
     """

@@ -4,11 +4,6 @@ import torch.nn.functional as F
 
 
 class moving_avg(nn.Module):
-    """
-    Moving average block to highlight the trend of time series
-    (from original PatchMLP)
-    """
-
     def __init__(self, kernel_size, stride):
         super(moving_avg, self).__init__()
         self.kernel_size = kernel_size

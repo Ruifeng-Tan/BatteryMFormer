@@ -31,9 +31,9 @@ DATASETS_TO_PROCESS = [
 # Datasets to copy without processing (no anomaly detection/correction)
 DATASETS_COPY_ONLY = ['ZN-coin']
 
-# Base directories
-BASE_INPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/SOH')
-BASE_OUTPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/processed_SOH')
+# Base directories (set via command-line arguments)
+BASE_INPUT_DIR: Path = None
+BASE_OUTPUT_DIR: Path = None
 
 
 def detect_zero_anomalies(soh: np.ndarray, cycle_numbers: np.ndarray) -> List[Dict]:
@@ -464,4 +464,11 @@ def main():
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='General dataset SOH preprocessing')
+    parser.add_argument('--base_input', type=str, required=True, help='Base input SOH directory')
+    parser.add_argument('--base_output', type=str, required=True, help='Base output processed SOH directory')
+    args = parser.parse_args()
+    BASE_INPUT_DIR = Path(args.base_input)
+    BASE_OUTPUT_DIR = Path(args.base_output)
     main()

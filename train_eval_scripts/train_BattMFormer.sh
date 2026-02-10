@@ -9,12 +9,12 @@ gpu_ids=0,1
 num_process=2
 # Main process port (avoid conflicts among multiple runs)
 master_port=29447
-seed=2021 # 2024
+seed=2024
 # ==========================================
 # 2. Model & Data Configuration
 # ==========================================
-model_name=BatteryMFormer # BatteryDformer_new,  BatteryDformerNoInterMultiAW
-dataset=Li_ion # Li_ion
+model_name=BatteryMFormer
+dataset=Li_ion
 input_mode=current_voltage  # Options: current_voltage or soh_to_soh
 
 # ========================================== 
@@ -27,17 +27,17 @@ stride=10
 cnn_channels=16
 num_segments=50
 top_k=2
-num_query=4
+num_query=10
 temperature=1.0
 
-k_dim=512
-d_model=128
+k_dim=256
+d_model=64
 n_heads=8
 e_layers=2
-d_layers=4
-d_ff=32
-d_ffs=32
-dropout=0.5
+d_layers=8
+d_ff=128
+d_ffs=128
+dropout=0.12
 weight_decay=0.0
 activation=gelu
 factor=1
@@ -50,12 +50,12 @@ d_llm=1024
 lambda_recovery=100.0
 lambda_mem=10.0
 lambda_life_loss=0.0
-batch_size=128      # Per-GPU batch size (global batch = batch_size * num_process)
-train_epochs=300
-learning_rate=0.00005
+batch_size=64       # Per-GPU batch size (global batch = batch_size * num_process)
+train_epochs=200
+learning_rate=7.78e-05
 lradj=constant
 warmup_epochs=5
-patience=30
+patience=20
 use_grad_clip=False
 
 # ==========================================
@@ -69,15 +69,15 @@ eol_threshold=0.8
 truncate_start_cycle=100
 task_name=soh_forecast
 
-# Paths
-root_path="/data/trf/python_works/BatteryLife/dataset"
-processed_SOH_path="/data/trf/python_works/BatteryLife/dataset/processed_SOH"
+# Paths (modify these to match your environment)
+root_path=/path/to/your/dataset
+processed_SOH_path=/path/to/your/processed_SOH
 
 
 # Modify the checkpoint path by adding kernel_size, stride, and cnn_channels
 checkpoints="./checkpoints/${model_name}_${dataset}_te${train_epochs}_ks${kernel_size}_st${stride}_ch${cnn_channels}_dff${d_ff}_dffs${d_ffs}_dm${d_model}_kdm${k_dim}_el${e_layers}_dl${d_layers}_bs${batch_size}_dr${dropout}_nh${n_heads}_lr${learning_rate}_nq${num_query}_${lambda_recovery}_${num_slots}_clip${use_grad_clip}_seed${seed}"
 
-cache_root="./.cache/"
+cache_root=/path/to/your/cache
 # ==========================================
 # 6. Execution Command
 # ==========================================

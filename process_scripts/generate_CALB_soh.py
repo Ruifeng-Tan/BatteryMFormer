@@ -2,7 +2,6 @@ import os
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
-import warnings
 from sklearn.linear_model import LinearRegression
 import pickle
 from datetime import datetime
@@ -104,11 +103,7 @@ def main(raw_data_file_path, output_path):
                 n_cycles = len(cycle_numbers)
 
                 if n_cycles < 2:
-                    # Not enough points for regression, keep original trajectory only
-                    warnings.warn(
-                        f"{cell_name}: not enough cycles for regression, "
-                        "keeping original trajectory only."
-                    )
+                    pass
                 else:
                     N = min(N, n_cycles)
                     X = np.array(cycle_numbers[-N:]).reshape(-1, 1)
@@ -129,10 +124,6 @@ def main(raw_data_file_path, output_path):
 
                     # If eol_cycle is before the last observed cycle, the fit is inconsistent
                     if eol_cycle_cont <= last_cycle:
-                        warnings.warn(
-                            f"{cell_name}: computed eol_cycle ({eol_cycle_cont:.2f}) "
-                            f"<= last_cycle ({last_cycle}), skip extrapolation."
-                        )
                         eol_cycle_cont = last_cycle + 1
                     else:
                         # Round up to the nearest integer cycle

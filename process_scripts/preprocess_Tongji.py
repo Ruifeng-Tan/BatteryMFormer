@@ -6,8 +6,6 @@ Simple processing logic:
 - Use interpolation to smooth the region
 - Record all problematic cycles
 
-FIXED: Previous version had "avalanche effect" where continuous replacement
-led to flat lines. Now uses region detection instead of single-point replacement.
 """
 
 import pickle
@@ -19,10 +17,9 @@ from typing import Dict, List
 THRESHOLD_CHANGE = 1.0  # 1% threshold for detecting anomaly start
 MAX_ANOMALY_LENGTH = 10  # Maximum length of an anomaly region
 
-# Path Configuration
-INPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/SOH/Tongji')
-OUTPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/processed_SOH/Tongji')
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# Path Configuration (set via command-line arguments)
+INPUT_DIR: Path = None
+OUTPUT_DIR: Path = None
 
 
 def calculate_relative_changes(soh: np.ndarray) -> np.ndarray:
@@ -218,4 +215,12 @@ def main():
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Tongji Dataset SOH preprocessing')
+    parser.add_argument('--input', type=str, required=True, help='Input SOH directory for Tongji')
+    parser.add_argument('--output', type=str, required=True, help='Output processed SOH directory for Tongji')
+    args = parser.parse_args()
+    INPUT_DIR = Path(args.input)
+    OUTPUT_DIR = Path(args.output)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     main()

@@ -20,9 +20,6 @@ from collections import defaultdict
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Add timesfm to path
-sys.path.insert(0, '/ai/dl_project/timesfm/src')
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description='TimesFM Baseline Evaluation')
@@ -50,14 +47,19 @@ def parse_args():
     # Output
     parser.add_argument('--output_dir', type=str, default='./results/timesfm')
     parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--cache_root', type=str, default='./.cache',
+                        help='Root directory for cached preprocessed data')
 
     return parser.parse_args()
 
 
 def load_cache_data(args):
     """Load preprocessed data from cache"""
-    cache_key = f"{args.dataset}_{args.seed}_{args.flag}_current_voltage_{args.early_cycle_threshold}_{args.charge_discharge_length}_{args.seq_len}_{args.max_trajectory_len}_capresample{args.use_capacity_resample}_v3_soc"
-    cache_file = f"./.cache/{cache_key}.pkl"
+    cache_key = (f"{args.dataset}_{args.seed}_{args.flag}_current_voltage_"
+                 f"{args.early_cycle_threshold}_{args.charge_discharge_length}_"
+                 f"{args.seq_len}_{args.max_trajectory_len}_"
+                 f"capresample{args.use_capacity_resample}_v3_soc_alignchk1")
+    cache_file = f"{args.cache_root}/{cache_key}.pkl"
 
     if not os.path.exists(cache_file):
         raise FileNotFoundError(f"Cache file not found: {cache_file}\n"

@@ -381,7 +381,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
             break
 
     # ===========================
-    # 5. 训练结束后记录总结指标
+    # 5. Summary after training
     # ===========================
     if accelerator.is_main_process:
         accelerator.print("\n" + "="*80)

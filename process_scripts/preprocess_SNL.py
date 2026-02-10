@@ -24,10 +24,9 @@ ANCHOR_POINTS = 5
 RECOVERY_TOLERANCE = 0.02     # SOH needs to recover within 2% of pre-anomaly level
 MAX_ANOMALY_LENGTH = 100       # Maximum length of an anomaly region (prevent avalanche)
 
-# Path Configuration
-INPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/SOH/SNL')
-OUTPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/processed_SOH/SNL')
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# Path Configuration (set via command-line arguments)
+INPUT_DIR: Path = None
+OUTPUT_DIR: Path = None
 
 
 def calculate_relative_changes(soh: np.ndarray) -> np.ndarray:
@@ -453,4 +452,12 @@ def main():
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='SNL Dataset SOH preprocessing')
+    parser.add_argument('--input', type=str, required=True, help='Input SOH directory for SNL')
+    parser.add_argument('--output', type=str, required=True, help='Output processed SOH directory for SNL')
+    args = parser.parse_args()
+    INPUT_DIR = Path(args.input)
+    OUTPUT_DIR = Path(args.output)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     main()

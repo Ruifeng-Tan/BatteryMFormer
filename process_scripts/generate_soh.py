@@ -6,7 +6,6 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 from sklearn.linear_model import LinearRegression
-import warnings
 import traceback
 import copy
 import matplotlib.pyplot as plt
@@ -111,12 +110,6 @@ def process_one_cell(args):
             raw_sohs, spike_indices = fix_spike_drops(raw_sohs, max_drop_per_cycle=0.03)
 
 
-        if spike_indices:
-            spike_cycles = [cycle_numbers[i] for i in spike_indices]
-            warnings.warn(
-                f"{cell_name}: Fixed {len(spike_indices)} spike drops at cycles {spike_cycles}"
-            )
-
         # 3. Check Filter Threshold (Battery too healthy)
         if raw_sohs[-1] > filter_threshold:
             return cell_name, f"Final SOH {raw_sohs[-1]:.4f} > threshold {filter_threshold}"
@@ -142,9 +135,7 @@ def process_one_cell(args):
             n_cycles = len(cycle_numbers)
 
             if n_cycles < 2:
-                warnings.warn(
-                    f"{cell_name}: not enough cycles for regression, keeping original only."
-                )
+                pass
             else:
                 N = min(N, n_cycles)
                 X = np.array(cycle_numbers[-N:]).reshape(-1, 1)
@@ -167,19 +158,13 @@ def process_one_cell(args):
                 last_cycle = int(cycle_numbers[-1])
 
                 if eol_cycle_cont <= last_cycle:
-                    warnings.warn(
-                        f"{cell_name}: computed eol_cycle ({eol_cycle_cont:.2f}) "
-                        f"<= last_cycle ({last_cycle}), skip extrapolation."
-                    )
+                    pass
                 else:
                     eol_cycle = int(np.ceil(eol_cycle_cont))
                     extra_cycles = list(range(last_cycle + 1, eol_cycle + 1))
 
                     # Check 2: Limit maximum extrapolation cycles
                     if len(extra_cycles) > MAX_EXTRAPOLATE_CYCLES:
-                        warnings.warn(
-                            f"{cell_name}: extrapolation {len(extra_cycles)} cycles exceeds limit {MAX_EXTRAPOLATE_CYCLES}, truncating."
-                        )
                         extra_cycles = extra_cycles[:MAX_EXTRAPOLATE_CYCLES]
 
                     if len(extra_cycles) > 0:

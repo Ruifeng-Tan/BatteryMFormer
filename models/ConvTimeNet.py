@@ -1,16 +1,3 @@
-"""
-ConvTimeNet for SOH Trajectory Forecasting
-Paper: https://arxiv.org/abs/2403.01493
-
-Adapted from the original ConvTimeNet implementation.
-Architecture kept unchanged: Deformable Patching + Depthwise Conv Encoder + Flatten Head.
-Only input reshape and output channel aggregation are added for the battery SOH task.
-
-Supports two input modes:
-1. current_voltage: Input charge/discharge curves [B, num_cycles, num_vars, curve_len]
-2. soh_to_soh: Input historical SOH [B, early_cycle_threshold, 1]
-"""
-
 import torch
 from torch import nn
 from layers.ConvTimeNet_backbone import ConvTimeNet_backbone

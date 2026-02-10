@@ -5,13 +5,14 @@ This is the official repository for "BatteryMFormer: Multi-level Learning for Ba
 # Requirements
 Please install the required packages listed in the `requirements.txt` file:
 ```
+# Python 3.9.25
+# RTX 3090
 pip install -r requirements.txt
 ```
 
 # Data availability 
 
-Please directly download the .pkl files from [version v9 BatteryLife data](https://zenodo.org/records/17958489) for later data processing. The ISU_ILCC dataset is downloadable at [ISU_ILCC dataset](https://iastate.figshare.com/articles/dataset/_b_ISU-ILCC_Battery_Aging_Dataset_b_/22582234).
-
+The raw ISU_ILCC dataset is downloadable at [ISU_ILCC dataset](https://iastate.figshare.com/articles/dataset/_b_ISU-ILCC_Battery_Aging_Dataset_b_/22582234). We rely on the some files in the raw ISU_ILCC data to do the preprocessing of the degradation trajectory. For other datasets, please directly download the .pkl files from [version v9 BatteryLife data](https://zenodo.org/records/17958489) for later data processing.
 
 # Quick start
 
@@ -29,7 +30,6 @@ To skip this step, you can also download the processed data from [link](https://
 ## Training
 
 You can run the following command to train the model:
-
 ```
 sh train_eval_scripts/train_BattMFormer.sh
 Tip: set random seeds and hyperparameters consistently if you plan to reproduce results in our paper.

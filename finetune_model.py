@@ -1,33 +1,30 @@
 """
-Fine-tuning script for MemoryNet models.
+Fine-tuning script for pretrained models.
 
 Usage:
     python finetune_model.py \
-        --pretrained_path ./checkpoints/CPTransformer_Li_ion_current_voltage \
+        --pretrained_path ./checkpoints/BatteryMFormer_Li_ion \
         --finetune_dataset CALB \
         --finetune_lr 0.00001 \
-        --finetune_epochs 50 \
-        --freeze_mode encoder
+        --finetune_epochs 50
 """
 
 import argparse
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import os
 import time
 import json
 import random
-import shutil
 from accelerate import Accelerator, DistributedDataParallelKwargs, load_checkpoint_in_model
 from accelerate.utils import set_seed as accelerate_set_seed
 from data_provider.data_factory import data_provider_soh
 from utils.tools import EarlyStopping
 import joblib
-from models import PatchTST, iTransformer, DLinear, Autoformer, CPTransformer, CPMLP, MultiPatchFormer
-from models import CPTransformer_draft, TimeMixer, TimeMixerPP, IC2ML, WPMixer, PatchMLP
-from models import BatteryMFormer_Trial2, BatteryMFormer_Trial, BatteryMFormer
+from models import PatchTST, iTransformer, DLinear, CPTransformer, CPMLP
+from models import TimeMixerPP, IC2ML, PatchMLP
+from models import BatteryMFormer, ConvTimeNet
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -52,19 +49,13 @@ def get_model(args):
         'PatchTST': PatchTST,
         'iTransformer': iTransformer,
         'DLinear': DLinear,
-        'Autoformer': Autoformer,
         'CPTransformer': CPTransformer,
-        'CPTransformer_draft': CPTransformer_draft,
         'CPMLP': CPMLP,
-        'TimeMixer': TimeMixer,
         'TimeMixerPP': TimeMixerPP,
-        'WPMixer': WPMixer,
         'PatchMLP': PatchMLP,
-        'MultiPatchFormer': MultiPatchFormer,
-        'BatteryMFormer_Trial2': BatteryMFormer_Trial2,
-        'BatteryMFormer_Trial': BatteryMFormer_Trial,
         'BatteryMFormer': BatteryMFormer,
         'IC2ML': IC2ML,
+        'ConvTimeNet': ConvTimeNet,
     }
 
     if args.model not in model_dict:
@@ -145,70 +136,6 @@ def print_parameter_stats(model, accelerator):
     accelerator.print(f"{'='*60}\n")
 
 
-def apply_freeze_strategy(model, freeze_mode, freeze_layers=None, accelerator=None):
-    """
-    Apply parameter freezing strategy
-
-    Args:
-        model: The model to freeze parameters
-        freeze_mode: Freezing strategy ('none', 'encoder', 'all_but_head', 'custom')
-        freeze_layers: Comma-separated layer names for custom mode
-        accelerator: Accelerator for printing
-    """
-    if freeze_mode == 'none':
-        for param in model.parameters():
-            param.requires_grad = True
-        if accelerator:
-            accelerator.print("Freeze mode: none - all parameters are trainable")
-        return
-
-    if freeze_mode == 'encoder':
-        # Freeze feature extraction layers, keep prediction head trainable
-        freeze_names = ['intra_embed', 'intra_MLP', 'encoder', 'soh_embed', 'pe',
-                       'cycle_embed', 'embed', 'patch_embedding', 'value_embedding']
-        for name, param in model.named_parameters():
-            if any(fn in name for fn in freeze_names):
-                param.requires_grad = False
-            else:
-                param.requires_grad = True
-        if accelerator:
-            accelerator.print(f"Freeze mode: encoder - freezing: {freeze_names}")
-
-    elif freeze_mode == 'all_but_head':
-        # Only train output layers (use startswith for exact matching)
-        # These are typically the final prediction heads
-        # IC2ML: soh_predictor, trajectory_predictor, RUL_predictor
-        # CPMLP: output_projection
-        # BatteryMFormer_Trial2: trajectory_decoder, life_predictor, output_extrapolation
-        unfreeze_prefixes = ['output_projection', 'soh_output_projection', 'head.', 'fc_out', 'linear_out', 'predict_',
-                            'soh_predictor', 'trajectory_predictor', 'RUL_predictor',
-                            'trajectory_decoder', 'life_predictor', 'output_extrapolation']
-        for name, param in model.named_parameters():
-            # Check if parameter name starts with any of the unfreeze prefixes
-            if any(name.startswith(prefix) for prefix in unfreeze_prefixes):
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
-        if accelerator:
-            accelerator.print(f"Freeze mode: all_but_head - only training layers starting with: {unfreeze_prefixes}")
-
-    elif freeze_mode == 'custom':
-        if freeze_layers:
-            freeze_names = [x.strip() for x in freeze_layers.split(',')]
-            for name, param in model.named_parameters():
-                if any(fn in name for fn in freeze_names):
-                    param.requires_grad = False
-                else:
-                    param.requires_grad = True
-            if accelerator:
-                accelerator.print(f"Freeze mode: custom - freezing: {freeze_names}")
-        else:
-            if accelerator:
-                accelerator.print("Warning: custom freeze mode but no freeze_layers specified, all parameters trainable")
-            for param in model.parameters():
-                param.requires_grad = True
-
-
 def vali_model(loader, model, criterion, accelerator, args):
     """
     Validation/test function.
@@ -272,25 +199,7 @@ def finetune_train(model, train_loader, val_loader, test_loader, optimizer, crit
     checkpoint_path = args.checkpoints
     early_stopping = EarlyStopping(args, accelerator=accelerator, patience=args.patience, least_epochs=1)
 
-    # Check if we need to unfreeze after certain epochs
-    unfreeze_triggered = False
-
     for epoch in range(args.train_epochs):
-        # Progressive unfreezing
-        if args.unfreeze_after_epochs > 0 and epoch == args.unfreeze_after_epochs and not unfreeze_triggered:
-            accelerator.print(f"\n*** Epoch {epoch}: Unfreezing all parameters ***")
-            unwrapped_model = accelerator.unwrap_model(model)
-            for param in unwrapped_model.parameters():
-                param.requires_grad = True
-
-            # Recreate optimizer with all parameters and lower learning rate
-            new_lr = args.learning_rate * 0.1
-            optimizer = optim.AdamW(unwrapped_model.parameters(), lr=new_lr, weight_decay=args.weight_decay)
-            optimizer = accelerator.prepare(optimizer)
-            accelerator.print(f"  New learning rate: {new_lr:.2e}")
-            print_parameter_stats(unwrapped_model, accelerator)
-            unfreeze_triggered = True
-
         # Training phase
         model.train()
         train_loss = 0
@@ -471,11 +380,6 @@ def merge_args(pretrained_args, finetune_args):
     if finetune_args.processed_SOH_path is not None:
         merged.processed_SOH_path = finetune_args.processed_SOH_path
 
-    # Freeze strategy parameters
-    merged.freeze_mode = finetune_args.freeze_mode
-    merged.freeze_layers = finetune_args.freeze_layers
-    merged.unfreeze_after_epochs = finetune_args.unfreeze_after_epochs
-
     # Store pretrained path for reference
     merged.pretrained_path = finetune_args.pretrained_path
     merged.finetune_dataset = finetune_args.finetune_dataset
@@ -503,15 +407,6 @@ def main():
                         help='Early stopping patience')
     parser.add_argument('--weight_decay', type=float, default=0.01,
                         help='Weight decay for optimizer')
-
-    # Parameter freezing strategy
-    parser.add_argument('--freeze_mode', type=str, default='none',
-                        choices=['none', 'encoder', 'all_but_head', 'custom'],
-                        help='Parameter freezing strategy')
-    parser.add_argument('--freeze_layers', type=str, default=None,
-                        help='Custom layers to freeze (comma-separated, e.g., "intra_embed,encoder")')
-    parser.add_argument('--unfreeze_after_epochs', type=int, default=0,
-                        help='Unfreeze all parameters after N epochs (0 = never unfreeze)')
 
     # Learning rate scheduling
     parser.add_argument('--lradj', type=str, default='warmup_cosine',
@@ -551,6 +446,13 @@ def main():
     print(f"Loading pretrained configuration from: {args.pretrained_path}")
     pretrained_args = load_pretrained_args(args.pretrained_path)
 
+    # Normalize legacy model names to current names
+    _MODEL_ALIASES = {
+        'BatteryMFormer_Trial2': 'BatteryMFormer',
+    }
+    if pretrained_args.model in _MODEL_ALIASES:
+        pretrained_args.model = _MODEL_ALIASES[pretrained_args.model]
+
     # Merge args
     merged_args = merge_args(pretrained_args, args)
 
@@ -585,7 +487,6 @@ def main():
     accelerator.print(f"Model: {merged_args.model}")
     accelerator.print(f"Input mode: {merged_args.input_mode}")
     accelerator.print(f"Learning rate: {merged_args.learning_rate:.2e}")
-    accelerator.print(f"Freeze mode: {merged_args.freeze_mode}")
     accelerator.print(f"Epochs: {merged_args.train_epochs}")
     accelerator.print(f"Batch size: {merged_args.batch_size}")
     accelerator.print(f"Mixed Precision: {accelerator.mixed_precision}")
@@ -599,8 +500,6 @@ def main():
     load_checkpoint_in_model(model, args.pretrained_path)
     accelerator.print("Pretrained weights loaded successfully!")
 
-    # Apply freeze strategy
-    apply_freeze_strategy(model, merged_args.freeze_mode, merged_args.freeze_layers, accelerator)
     print_parameter_stats(model, accelerator)
 
     # Load label_scaler from pretrained
@@ -639,7 +538,6 @@ def main():
         finetune_info = {
             'pretrained_path': args.pretrained_path,
             'finetune_dataset': args.finetune_dataset,
-            'freeze_mode': args.freeze_mode,
             'finetune_lr': merged_args.learning_rate,
             'finetune_epochs': merged_args.train_epochs
         }

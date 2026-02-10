@@ -11,12 +11,7 @@ Based on RWTH dataset analysis:
 - Very high data quality (98.96% normal)
 - Main anomalies: Characterization tests (SOH increases/decreases)
 - Time gaps: ~2h during tests
-- Allow SOH > 1.0 (possible capacity recovery)
 
-Key differences from MICH:
-- No clip on SOH > 1.0 (preserve original behavior)
-- No extreme threshold (use statistical thresholds only)
-- Use original SOH for anchor points (avoid bug)
 """
 
 import pickle
@@ -34,10 +29,9 @@ STABILITY_WINDOW = 10         # Stability detection: 10 consecutive cycles
 ANCHOR_POINTS = 5             # Number of anchor points for PCHIP interpolation
 RECOVERY_TOLERANCE = 0.002     # SOH needs to recover within 2% of pre-anomaly level
 
-# Path Configuration
-INPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/SOH/RWTH')
-OUTPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/processed_SOH/RWTH')
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# Path Configuration (set via command-line arguments)
+INPUT_DIR: Path = None
+OUTPUT_DIR: Path = None
 
 
 def calculate_relative_changes(soh: np.ndarray) -> np.ndarray:
@@ -475,4 +469,12 @@ def main():
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='RWTH Dataset SOH preprocessing')
+    parser.add_argument('--input', type=str, required=True, help='Input SOH directory for RWTH')
+    parser.add_argument('--output', type=str, required=True, help='Output processed SOH directory for RWTH')
+    args = parser.parse_args()
+    INPUT_DIR = Path(args.input)
+    OUTPUT_DIR = Path(args.output)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     main()

@@ -9,8 +9,6 @@ Features:
 5. Save processed data to processed_SOH directory
 
 Based on preprocess_HNEI.py with MICH-specific thresholds and special cycle detection
-Data quality: Medium (95.02% normal)
-Main issues: Cycle 444 extreme anomalies (Formation test), EOL zero values
 """
 
 import pickle
@@ -34,10 +32,9 @@ MAX_ANOMALY_LENGTH = 30       # Maximum length of an anomaly region (prevent ava
 # Special cycle detection (Formation test cycles)
 SPECIAL_CYCLES = [345, 444, 493, 534]  # Known Formation test cycles
 
-# Path Configuration
-INPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/SOH/MICH')
-OUTPUT_DIR = Path('/ai/dl_project/MemoryNet/dataset/processed_SOH/MICH')
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# Path Configuration (set via command-line arguments)
+INPUT_DIR: Path = None
+OUTPUT_DIR: Path = None
 
 
 def calculate_relative_changes(soh: np.ndarray) -> np.ndarray:
@@ -65,9 +62,6 @@ def find_stable_point(soh: np.ndarray, relative_changes: np.ndarray, start_idx: 
     Returns:
         Index where SOH has stabilized (either recovered or reached new stable level)
 
-    Note:
-        - Has MAX_ANOMALY_LENGTH limit to prevent excessive interpolation
-        - If anomaly region exceeds limit, returns limit to avoid "avalanche effect"
     """
     i = start_idx + 1
 
@@ -468,4 +462,12 @@ def main():
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='MICH Dataset SOH preprocessing')
+    parser.add_argument('--input', type=str, required=True, help='Input SOH directory for MICH')
+    parser.add_argument('--output', type=str, required=True, help='Output processed SOH directory for MICH')
+    args = parser.parse_args()
+    INPUT_DIR = Path(args.input)
+    OUTPUT_DIR = Path(args.output)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     main()

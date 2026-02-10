@@ -10,7 +10,6 @@ Output: all_rpt_positions.json with RPT position information for all cells.
 Usage:
     python extract_rpt_positions.py [--output OUTPUT_FILE]
 
-Author: Generated for MemoryNet project
 """
 
 import argparse
