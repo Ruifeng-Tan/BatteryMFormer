@@ -23,7 +23,7 @@ After downloading BatteryLife (v9) and ISU_ILCC data, run:
 ```
 bash process_scripts/run_soh_pipeline.sh
 ```
-Note that you should revise the args like `CALB_capacity_file_path` and `INPUT_DIR` in the script before running. The OUTPUT_DIR should be consistent with the processed_SOH_path in the training scripts
+Note that you should revise the args like `CALB_capacity_file_path`, `ISU_ILCC_RAW_DIR`, `SOH_DIR`, `INPUT_DIR` and `OUTPUT_DIR` in the script before running. The OUTPUT_DIR should be consistent with the processed_SOH_path in the training scripts
 
 ## Training
 
