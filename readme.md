@@ -26,7 +26,20 @@ bash process_scripts/run_soh_pipeline.sh
 Note that you should revise the args like `CALB_capacity_file_path`, `ISU_ILCC_RAW_DIR`, `SOH_DIR`, `INPUT_DIR` and `OUTPUT_DIR` in the script before running. The OUTPUT_DIR should be consistent with the processed_SOH_path in the training scripts
 
 ## Training
+### Generate the aging-condition embeddings
+You can skip this step since the generated aging-condition embeddings are already provided in the repository. If you wish to generate them yourself, please follow the steps below.
 
+You can use the `download_llm.py` to download the pretrained LLM:
+```
+python download_llm.py
+```
+
+Then, you can use `generate_aging_condition_new_dataset.py` to generate the aging-condition embeddings:
+```
+python generate_aging_condition_new_dataset.py
+```
+
+### Train the model
 You can run the following command to train the model:
 ```
 sh train_eval_scripts/train_BattMFormer.sh
