@@ -25,8 +25,6 @@ bash process_scripts/run_soh_pipeline.sh
 ```
 Note that you should revise the args like `CALB_capacity_file_path` and `INPUT_DIR` in the script before running. The OUTPUT_DIR should be consistent with the processed_SOH_path in the training scripts
 
-To skip this step, you can also download the processed SOH data from [link](https://huggingface.co/datasets/JintaoDong256/BatteryMFormer), and processed cycling data from [link](https://huggingface.co/datasets/JintaoDong256/BatteryMFormer_cycling_data).
-
 ## Training
 
 You can run the following command to train the model:
