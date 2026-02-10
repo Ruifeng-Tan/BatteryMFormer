@@ -1,160 +1,124 @@
 #!/bin/bash
 
-# CPMLP Training Script for MemoryNet
-# Pure MLP-based model for SOH trajectory forecasting
-# Usage:
-#   Single GPU: bash train_eval_scripts/train_cpmlp.sh [current_voltage|soh_to_soh|both]
-#   Multi GPU:  bash train_eval_scripts/train_cpmlp.sh [current_voltage|soh_to_soh|both] [num_gpus]
+# ==========================================
+# 1. Hardware & Environment Setup
+# ==========================================
+# Specify GPU IDs to use (e.g., "0" or "0,1,2,3")
+gpu_ids=0,1
+# Specify the number of GPUs (must match the count in gpu_ids)
+num_process=2
+# Main process port (avoid conflicts among multiple runs)
+master_port=29448
+seed=2024
 
-# Change to project root directory
-cd "$(dirname "$0")/.." || exit 1
+# ==========================================
+# 2. Model & Data Configuration
+# ==========================================
+model_name=CPMLP
+dataset=NA-ion
+input_mode=current_voltage  # Options: current_voltage or soh_to_soh
 
-# Default: Single GPU
-export CUDA_VISIBLE_DEVICES=2
+# ==========================================
+# 3. Model Architecture Hyperparameters
+# ==========================================
+d_model=128
+n_heads=4
+e_layers=4       # Intra-cycle MLP layers
+d_layers=2       # Inter-cycle MLP layers
+d_ff=256
+dropout=0.2
+activation=gelu
+factor=1
 
-# Model configuration
-MODEL=CPMLP
-DATASET=Li_ion
+# ==========================================
+# 4. Training Hyperparameters
+# ==========================================
+batch_size=512       # Per-GPU batch size (global batch = batch_size * num_process)
+train_epochs=250
+learning_rate=0.00005
+lradj=constant
+warmup_epochs=5
+weight_decay=0.01
+patience=50
+use_grad_clip=True
+grad_clip=1.0
 
-# Get input mode and GPU count from command line arguments
-MODE=${1:-both}
-NUM_GPUS=${2:-1}
+# ==========================================
+# 5. Sequence & Task Parameters
+# ==========================================
+seq_len=1
+pred_len=5000
+early_cycle_threshold=100
+charge_discharge_length=300
+eol_threshold=0.8
+truncate_start_cycle=100
+task_name=soh_forecast
 
-# Set multi-GPU environment if needed
-if [ "$NUM_GPUS" -gt 2 ]; then
-    export CUDA_VISIBLE_DEVICES=2,3,4
-    USE_MULTI_GPU="--use_multi_gpu"
-    echo "Multi-GPU training enabled: ${NUM_GPUS} GPUs"
+# ==========================================
+# 6. Paths
+# ==========================================
+# root_path: directory containing dataset subdirectories (e.g., NA-ion/, MATR/, HUST/, ...)
+# processed_SOH_path: directory containing processed SOH trajectory subdirectories
+# cache_root: directory for caching preprocessed data
+root_path=/path/to/your/dataset
+processed_SOH_path=/path/to/your/processed_SOH
+cache_root=/path/to/your/cache
+
+checkpoints="./checkpoints/${model_name}_${dataset}_${input_mode}_dm${d_model}_el${e_layers}_dl${d_layers}_dff${d_ff}_bs${batch_size}_dr${dropout}_lr${learning_rate}_seed${seed}"
+
+# ==========================================
+# 7. Execution Command
+# ==========================================
+# Note: Remove --resume_existing if you do not need to resume training
+# Note: --mixed_precision fp16 corresponds to --use_amp in the training script
+
+BASE_CMD="CUDA_VISIBLE_DEVICES=$gpu_ids accelerate launch \
+  --mixed_precision fp16 \
+  --num_processes $num_process \
+  --main_process_port $master_port \
+  run_main.py \
+  --model $model_name \
+  --dataset $dataset \
+  --root_path $root_path \
+  --processed_SOH_path $processed_SOH_path \
+  --checkpoints $checkpoints \
+  --input_mode $input_mode \
+  --batch_size $batch_size \
+  --train_epochs $train_epochs \
+  --learning_rate $learning_rate \
+  --lradj $lradj \
+  --warmup_epochs $warmup_epochs \
+  --weight_decay $weight_decay \
+  --patience $patience \
+  --d_model $d_model \
+  --n_heads $n_heads \
+  --e_layers $e_layers \
+  --d_layers $d_layers \
+  --d_ff $d_ff \
+  --dropout $dropout \
+  --activation $activation \
+  --factor $factor \
+  --seq_len $seq_len \
+  --pred_len $pred_len \
+  --eol_threshold $eol_threshold \
+  --truncate_start_cycle $truncate_start_cycle \
+  --early_cycle_threshold $early_cycle_threshold \
+  --charge_discharge_length $charge_discharge_length \
+  --task_name $task_name \
+  --cache_root $cache_root \
+  --gpu 0 \
+  --seed $seed \
+  --use_amp \
+  --accumulation_steps 1 \
+  --use_multi_gpu \
+  --resume_existing \
+  --use_capacity_resample"
+
+# Add gradient clipping arguments based on use_grad_clip
+if [ "$use_grad_clip" = "True" ] || [ "$use_grad_clip" = "true" ]; then
+    FULL_CMD="$BASE_CMD --use_grad_clip --grad_clip $grad_clip"
 else
-    export CUDA_VISIBLE_DEVICES=2
-    USE_MULTI_GPU=""
-    echo "Single GPU training"
+    FULL_CMD="$BASE_CMD"
 fi
 
-# Shared training parameters
-LR=0.00005
-LRADJ=constant
-WARMUP_EPOCHS=5
-WEIGHT_DECAY=0.01
-GRAD_CLIP=1.0
-PATIENCE=50
-INPUT_CYCLES=100
-
-# Model architecture parameters (CPMLP uses simpler architecture)
-D_MODEL=128
-N_HEADS=4        # Not used in MLP, kept for consistency
-E_LAYERS=4       # Intra-cycle MLP layers
-D_LAYERS=2       # Inter-cycle MLP layers
-D_FF=256
-DROPOUT=0.2
-ACTIVATION=gelu
-FACTOR=1
-
-# Data parameters
-SEQ_LEN=1
-PRED_LEN=5000
-EARLY_CYCLE_THRESHOLD=100
-CHARGE_DISCHARGE_LENGTH=300
-EOL_THRESHOLD=0.8
-TRUNCATE_START_CYCLE=100
-
-# Paths
-ROOT_PATH="/ai/dl_project/MemoryNet/dataset/cleaned_data"
-processed_SOH_path="/ai/dl_project/MemoryNet/dataset/processed_SOH"
-CACHE_ROOT="./.cache/"
-INPUT_MODE=current_voltage
-BATCH_SIZE=512
-EPOCHS=250
-
-# Function to train a single mode
-train_mode() {
-    # Adjust checkpoint dir for multi-GPU
-    if [ "$NUM_GPUS" -gt 1 ]; then
-        CHECKPOINT_DIR="./checkpoints/${MODEL}_${DATASET}_${INPUT_MODE}_${NUM_GPUS}gpu"
-    else
-        CHECKPOINT_DIR="./checkpoints/${MODEL}_${DATASET}_${INPUT_MODE}"
-    fi
-
-    echo "========================================="
-    echo "Training ${MODEL} with ${INPUT_MODE} mode"
-    echo "GPUs: ${NUM_GPUS}"
-    echo "Batch size per GPU: ${BATCH_SIZE}"
-    if [ "$NUM_GPUS" -gt 1 ]; then
-        echo "Total batch size: $((BATCH_SIZE * NUM_GPUS))"
-    fi
-    echo "Epochs: ${EPOCHS}"
-    echo "========================================="
-
-    # Create checkpoint directory
-    mkdir -p $CHECKPOINT_DIR
-
-    # Choose training command based on GPU count
-    if [ "$NUM_GPUS" -gt 1 ]; then
-        TRAIN_CMD="accelerate launch --num_processes ${NUM_GPUS} --mixed_precision fp16 run_main.py"
-    else
-        TRAIN_CMD="python run_main.py"
-    fi
-
-    # Run training
-    $TRAIN_CMD \
-        --model $MODEL \
-        --dataset $DATASET \
-        --root_path $ROOT_PATH \
-        --processed_SOH_path $processed_SOH_path \
-        --checkpoints $CHECKPOINT_DIR \
-        --input_mode $INPUT_MODE \
-        --batch_size $BATCH_SIZE \
-        --train_epochs $EPOCHS \
-        --learning_rate $LR \
-        --lradj $LRADJ \
-        --warmup_epochs $WARMUP_EPOCHS \
-        --weight_decay $WEIGHT_DECAY \
-        --grad_clip $GRAD_CLIP \
-        --patience $PATIENCE \
-        --d_model $D_MODEL \
-        --n_heads $N_HEADS \
-        --e_layers $E_LAYERS \
-        --d_layers $D_LAYERS \
-        --d_ff $D_FF \
-        --dropout $DROPOUT \
-        --activation $ACTIVATION \
-        --factor $FACTOR \
-        --seq_len $SEQ_LEN \
-        --pred_len $PRED_LEN \
-        --eol_threshold $EOL_THRESHOLD \
-        --truncate_start_cycle $TRUNCATE_START_CYCLE \
-        --early_cycle_threshold $EARLY_CYCLE_THRESHOLD \
-        --charge_discharge_length $CHARGE_DISCHARGE_LENGTH \
-        --task_name soh_forecast \
-        --cache_root $CACHE_ROOT \
-        --gpu 0 \
-        --seed 2024 \
-        --use_amp \
-        --accumulation_steps 1 \
-        $USE_MULTI_GPU \
-        --use_capacity_resample \
-        --resume_existing
-
-    echo ""
-    echo "Completed training ${INPUT_MODE} mode"
-    echo ""
-}
-
-# Train based on mode selection
-if [ "$MODE" = "current_voltage" ]; then
-    train_mode "current_voltage" 128 500
-elif [ "$MODE" = "soh_to_soh" ]; then
-    train_mode "soh_to_soh" 48 600
-elif [ "$MODE" = "both" ]; then
-    echo "Training both input modes..."
-    echo ""
-    train_mode "soh_to_soh" 128 600
-    train_mode "current_voltage" 256 800
-    echo "========================================="
-    echo "All training completed!"
-    echo "========================================="
-else
-    echo "Error: Invalid mode '$MODE'"
-    echo "Usage: bash train_eval_scripts/train_cpmlp.sh [current_voltage|soh_to_soh|both] [num_gpus]"
-    exit 1
-fi
+eval $FULL_CMD

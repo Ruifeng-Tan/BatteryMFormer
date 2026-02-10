@@ -1,125 +1,96 @@
 #!/bin/bash
 
-# PatchMLP Training Script
-# Usage: bash train_eval_scripts/train_patchmlp.sh [current_voltage|soh_to_soh|both] [num_gpus]
-# Examples:
-#   bash train_eval_scripts/train_patchmlp.sh current_voltage        # Single GPU
-#   bash train_eval_scripts/train_patchmlp.sh current_voltage 2      # 2 GPUs
+# ==========================================
+# 1. Hardware & Environment Setup
+# ==========================================
+# Specify GPU IDs to use (e.g., "0" or "0,1,2,3")
+gpu_ids=0,1
+# Specify the number of GPUs (must match the count in gpu_ids)
+num_process=2
+# Main process port (avoid conflicts among multiple runs)
+master_port=29452
+seed=2024
 
-cd "$(dirname "$0")/.." || exit 1
+# ==========================================
+# 2. Model & Data Configuration
+# ==========================================
+model_name=PatchMLP
+dataset=NA-ion
+input_mode=current_voltage  # Options: current_voltage or soh_to_soh
 
-MODEL=PatchMLP
-DATASET=Li_ion
-MODE=${1:-current_voltage}
-NUM_GPUS=${2:-1}
+# ==========================================
+# 3. Model Architecture Hyperparameters
+# ==========================================
+d_model=128
+e_layers=3
+dropout=0.1
+activation=gelu
+use_norm=1
 
-# Set multi-GPU environment if needed
-if [ "$NUM_GPUS" -gt 1 ]; then
-    export CUDA_VISIBLE_DEVICES=0,1
-    USE_MULTI_GPU="--use_multi_gpu"
-    echo "Multi-GPU training enabled: ${NUM_GPUS} GPUs (0,1)"
-else
-    export CUDA_VISIBLE_DEVICES=0
-    USE_MULTI_GPU=""
-    echo "Single GPU training (GPU 0)"
-fi
+# ==========================================
+# 4. Training Hyperparameters
+# ==========================================
+batch_size=32        # Per-GPU batch size (global batch = batch_size * num_process)
+train_epochs=250
+learning_rate=0.0001
+weight_decay=0.01
+patience=50
 
-# Model architecture
-D_MODEL=128
-E_LAYERS=3
-DROPOUT=0.1
+# ==========================================
+# 5. Sequence & Task Parameters
+# ==========================================
+seq_len=1
+pred_len=5000
+early_cycle_threshold=100
+charge_discharge_length=300
+eol_threshold=0.8
+task_name=soh_forecast
 
-# Training hyperparameters
-LR=0.0001
-WEIGHT_DECAY=0.01
-PATIENCE=50
-EPOCHS=250
-SEED=2024
+# ==========================================
+# 6. Paths
+# ==========================================
+# root_path: directory containing dataset subdirectories (e.g., NA-ion/, MATR/, HUST/, ...)
+# processed_SOH_path: directory containing processed SOH trajectory subdirectories
+# cache_root: directory for caching preprocessed data
+root_path=/path/to/your/dataset
+processed_SOH_path=/path/to/your/processed_SOH
+cache_root=/path/to/your/cache
 
-# Data params (MUST match for cache compatibility)
-SEQ_LEN=1
-PRED_LEN=5000
-EARLY_CYCLE_THRESHOLD=100
-CHARGE_DISCHARGE_LENGTH=300
-EOL_THRESHOLD=0.8
+checkpoints="./checkpoints/${model_name}_${dataset}_${input_mode}_dm${d_model}_el${e_layers}_bs${batch_size}_dr${dropout}_lr${learning_rate}_seed${seed}"
 
-# Paths
-ROOT_PATH="/data/trf/python_works/BatteryLife/dataset"
-PROCESSED_SOH_PATH="/data/trf/python_works/BatteryLife/dataset/processed_SOH"
-CACHE_ROOT="/home/djt/Trajectory_forecasting/.cache/"
+# ==========================================
+# 7. Execution Command
+# ==========================================
 
-train_mode() {
-    local INPUT_MODE=$1
-    local BATCH_SIZE=$2
-
-    # Adjust checkpoint dir for multi-GPU
-    if [ "$NUM_GPUS" -gt 1 ]; then
-        CHECKPOINT_DIR="./checkpoints/${MODEL}_${DATASET}_${INPUT_MODE}_seed${SEED}_${NUM_GPUS}gpu"
-    else
-        CHECKPOINT_DIR="./checkpoints/${MODEL}_${DATASET}_${INPUT_MODE}_seed${SEED}"
-    fi
-
-    echo "========================================="
-    echo "Training ${MODEL} [${INPUT_MODE}]"
-    echo "GPUs: ${NUM_GPUS}"
-    echo "Batch: ${BATCH_SIZE}, Epochs: ${EPOCHS}"
-    echo "========================================="
-
-    mkdir -p $CHECKPOINT_DIR
-
-    # Choose training command based on GPU count
-    if [ "$NUM_GPUS" -gt 1 ]; then
-        TRAIN_CMD="accelerate launch --num_processes ${NUM_GPUS} --mixed_precision fp16 run_main.py"
-    else
-        TRAIN_CMD="python run_main.py"
-    fi
-
-    $TRAIN_CMD \
-        --model $MODEL \
-        --dataset $DATASET \
-        --root_path $ROOT_PATH \
-        --processed_SOH_path $PROCESSED_SOH_PATH \
-        --checkpoints $CHECKPOINT_DIR \
-        --input_mode $INPUT_MODE \
-        --batch_size $BATCH_SIZE \
-        --train_epochs $EPOCHS \
-        --learning_rate $LR \
-        --weight_decay $WEIGHT_DECAY \
-        --dropout $DROPOUT \
-        --patience $PATIENCE \
-        --d_model $D_MODEL \
-        --e_layers $E_LAYERS \
-        --activation gelu \
-        --seq_len $SEQ_LEN \
-        --pred_len $PRED_LEN \
-        --eol_threshold $EOL_THRESHOLD \
-        --early_cycle_threshold $EARLY_CYCLE_THRESHOLD \
-        --charge_discharge_length $CHARGE_DISCHARGE_LENGTH \
-        --task_name soh_forecast \
-        --cache_root $CACHE_ROOT \
-        --gpu 0 \
-        --seed $SEED \
-        --use_norm 1 \
-        --use_capacity_resample \
-        $USE_MULTI_GPU
-
-    echo "Completed ${INPUT_MODE}"
-}
-
-case "$MODE" in
-    current_voltage)
-        train_mode "current_voltage" 32
-        ;;
-    soh_to_soh)
-        train_mode "soh_to_soh" 256
-        ;;
-    both)
-        train_mode "current_voltage" 32
-        train_mode "soh_to_soh" 256
-        echo "All training completed!"
-        ;;
-    *)
-        echo "Usage: bash train_eval_scripts/train_patchmlp.sh [current_voltage|soh_to_soh|both]"
-        exit 1
-        ;;
-esac
+CUDA_VISIBLE_DEVICES=$gpu_ids accelerate launch \
+  --mixed_precision fp16 \
+  --num_processes $num_process \
+  --main_process_port $master_port \
+  run_main.py \
+  --model $model_name \
+  --dataset $dataset \
+  --root_path $root_path \
+  --processed_SOH_path $processed_SOH_path \
+  --checkpoints $checkpoints \
+  --input_mode $input_mode \
+  --batch_size $batch_size \
+  --train_epochs $train_epochs \
+  --learning_rate $learning_rate \
+  --weight_decay $weight_decay \
+  --dropout $dropout \
+  --patience $patience \
+  --d_model $d_model \
+  --e_layers $e_layers \
+  --activation $activation \
+  --seq_len $seq_len \
+  --pred_len $pred_len \
+  --eol_threshold $eol_threshold \
+  --early_cycle_threshold $early_cycle_threshold \
+  --charge_discharge_length $charge_discharge_length \
+  --task_name $task_name \
+  --cache_root $cache_root \
+  --gpu 0 \
+  --seed $seed \
+  --use_norm $use_norm \
+  --use_capacity_resample \
+  --use_multi_gpu
