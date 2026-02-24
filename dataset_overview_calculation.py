@@ -108,7 +108,7 @@ for dataset in dataset_list:
                 i = i.replace('--', '-#')
             new_total_samples_name.append(i)
         # count aging conditions
-        aging_conditions_id = [aging_conditions[i ] for i in available_cells if i in aging_conditions]
+        aging_conditions_id = [aging_conditions[i] for i in available_cells if i in aging_conditions]
         print('Aging conditions:', len(set(aging_conditions_id)))
 
     print('-------------------------------------')
