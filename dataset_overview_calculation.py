@@ -1,6 +1,6 @@
 import json
 import os
-
+import pickle
 # get all data split json files
 data_split_path = './data_provider/split_json/'
 data_split_json_files_path = os.listdir(data_split_path)
@@ -9,19 +9,30 @@ data_split_json_files = [i for i in data_split_json_files if not i.startswith('S
 
 # get all labeled sample names
 # tongji: -#
-label_path = '/data/trf/python_works/BatteryLife/dataset/Life labels'
-label_files_path = os.listdir(label_path)
-label_json_files = [i for i in label_files_path if i.endswith('.json')]
+procssed_soh_path = '/data/trf/python_works/BatteryLife/dataset/processed_SOH'
+dataset_names = ['CALB', 'NA-ion', 'ZN-coin', 'CALCE', 'HNEI', 'HUST', 'ISU_ILCC', 'MATR', 'MICH', 'MICH_EXP', 'RWTH', 'SNL', 'Stanford_2',
+'Tongji', 'UL_PUR', 'XJTU']
+
 label_names = []
-for file in label_json_files:
-    if file.startswith('Stanford_labels'):
-        continue
-    with open(os.path.join(label_path, file), 'r') as f:
-        label_data = json.load(f)
-    # print(file, len(label_data))
-    for key, value in label_data.items():
-        filename = key.split('.pkl')[0]
+# for file in label_json_files:
+#     if file.startswith('Stanford_labels'):
+#         continue
+#     with open(os.path.join(label_path, file), 'r') as f:
+#         label_data = json.load(f)
+#     # print(file, len(label_data))
+#     for key, value in label_data.items():
+#         filename = key.split('.pkl')[0]
+#         label_names.append(filename)
+for dataset_name in dataset_names:
+    dataset_dir = os.path.join(procssed_soh_path, dataset_name)
+    cell_files = os.listdir(dataset_dir)
+    for cell_file in cell_files:
+        cell_data = pickle.load(open(os.path.join(dataset_dir, cell_file), 'rb'))
+        life_label = len(cell_data['SOH'])
+        filename = cell_file.split('.pkl')[0]
+        
         label_names.append(filename)
+    
 
 # get aging condition mapping
 with open('./name2agingConditionID.json') as file:
