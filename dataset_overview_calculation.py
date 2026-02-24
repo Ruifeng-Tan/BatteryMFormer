@@ -29,18 +29,16 @@ for dataset_name in dataset_names:
     for cell_file in cell_files:
         cell_data = pickle.load(open(os.path.join(dataset_dir, cell_file), 'rb'))
         life_label = len(cell_data['SOH'])
-        filename = cell_file.split('.pkl')[0]
-        
-        label_names.append(filename)
+        label_names.append(cell_file)
     
-
+print(len(label_names))
 # get aging condition mapping
 with open('./name2agingConditionID.json') as file:
     aging_conditions = json.load(file)
 
 
 dataset_list = ['Li-ion', 'Na-ion', 'Zn-ion', 'CALB']
-seed_list = [42, 2021, 2024]
+seed_list = [2021]
 for dataset in dataset_list:
     for seed in seed_list:
         if dataset == 'Li-ion':
@@ -81,27 +79,36 @@ for dataset in dataset_list:
         
 
         print('Dataset:', dataset, 'Seed:', seed)
-        # count the available battery number
-        # tongji: --
-        total_samples_name = []
-        for file in datasets:
-            with open(os.path.join(data_split_path, file), 'r') as f:
-                data_split = json.load(f)
-            total_samples_name.extend([i.split('.pkl')[0] for i in data_split['train']])
-            total_samples_name.extend([i.split('.pkl')[0] for i in data_split['val']])
-            total_samples_name.extend([i.split('.pkl')[0] for i in data_split['test']])
+        total_files = []
+        for dataset_name in datasets:
+            dataset_path = os.path.join(data_split_path, dataset_name)
+            split_record = json.load(open(dataset_path, 'r'))
+            dataset_files = split_record['train'] + split_record['val'] + split_record['test']
+            used_dataset_files = []
+            for dataset_file in dataset_files:
+                if dataset_file in label_names:
+                    used_dataset_files.append(dataset_file)
+            total_files = total_files + used_dataset_files
+        # # count the available battery number
+        # # tongji: --
+        # total_samples_name = []
+        # for file in datasets:
+        #     with open(os.path.join(data_split_path, file), 'r') as f:
+        #         data_split = json.load(f)
+        #     total_samples_name.extend([i.split('.pkl')[0] for i in data_split['train']])
+        #     total_samples_name.extend([i.split('.pkl')[0] for i in data_split['val']])
+        #     total_samples_name.extend([i.split('.pkl')[0] for i in data_split['test']])
+
+        available_cells = [i for i in total_files if i in label_names]
+        print('Available batteries:', len(available_cells))
 
         new_total_samples_name = []
-        for i in total_samples_name:
+        for i in available_cells:
             if 'Tongji' in i:
                 i = i.replace('--', '-#')
             new_total_samples_name.append(i)
-
-        available_cells = [i for i in new_total_samples_name if i in label_names]
-        print('Available batteries:', len(available_cells))
-
         # count aging conditions
-        aging_conditions_id = [aging_conditions[i + '.pkl'] for i in available_cells if i + '.pkl' in aging_conditions]
+        aging_conditions_id = [aging_conditions[i ] for i in available_cells if i in aging_conditions]
         print('Aging conditions:', len(set(aging_conditions_id)))
 
     print('-------------------------------------')
