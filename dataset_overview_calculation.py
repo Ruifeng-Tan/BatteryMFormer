@@ -29,7 +29,9 @@ for dataset_name in dataset_names:
     for cell_file in cell_files:
         cell_data = pickle.load(open(os.path.join(dataset_dir, cell_file), 'rb'))
         life_label = len(cell_data['SOH'])
-        label_names.append(cell_file)
+        if life_label > 100:
+            label_names.append(cell_file)
+        
     
 print(len(label_names))
 # get aging condition mapping
@@ -87,6 +89,7 @@ for dataset in dataset_list:
             used_dataset_files = []
             for dataset_file in dataset_files:
                 if dataset_file in label_names:
+                    # The cell should be in the split and have soh degradation trajectory
                     used_dataset_files.append(dataset_file)
             total_files = total_files + used_dataset_files
         # # count the available battery number
