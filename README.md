@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 # Data availability 
 
-The raw ISU_ILCC dataset is downloadable at [ISU_ILCC dataset](https://iastate.figshare.com/articles/dataset/_b_ISU-ILCC_Battery_Aging_Dataset_b_/22582234). We rely on the some files in the raw ISU_ILCC data to do the preprocessing of the degradation trajectory. For other datasets, please directly download the .pkl files from [version v9 BatteryLife data](https://zenodo.org/records/17958489) for later data processing.
+The raw ISU_ILCC dataset is downloadable at [ISU_ILCC dataset](https://iastate.figshare.com/articles/dataset/_b_ISU-ILCC_Battery_Aging_Dataset_b_/22582234). We rely on the some files in the raw ISU_ILCC data to do the preprocessing of the degradation trajectory. The .pkl files of XJTU, Zn-ion and CALB datasets should be downloaded from [version v10 BatteryLife data](https://zenodo.org/records/18646655). For other datasets, please directly download the .pkl files from [version v9 BatteryLife data](https://zenodo.org/records/17958489) for later data processing.
 
 # Quick start
 
