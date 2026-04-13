@@ -70,6 +70,7 @@ def get_model(args):
         'TimeMixerPP': TimeMixerPP,
         'PatchMLP': PatchMLP,
         'BatteryMFormer': BatteryMFormer,
+        'BatteryMFormer_v2': BatteryMFormer_v2,
         'IC2ML': IC2ML,
         'ConvTimeNet': ConvTimeNet,
     }
