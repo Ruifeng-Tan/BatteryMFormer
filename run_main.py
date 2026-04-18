@@ -16,7 +16,7 @@ from data_provider.data_factory import data_provider_soh
 from utils.tools import EarlyStopping
 import joblib
 from models import PatchTST, iTransformer, DLinear, CPTransformer, CPMLP, BatteryMFormer
-from models import TimeMixerPP, IC2ML, PatchMLP
+from models import TimeMixerPP, IC2ML, PatchMLP, CPTransformer_SameInput
 from models import ConvTimeNet
 import warnings
 import wandb  # <--- 1. 导入 wandb
@@ -70,7 +70,7 @@ def get_model(args):
         'TimeMixerPP': TimeMixerPP,
         'PatchMLP': PatchMLP,
         'BatteryMFormer': BatteryMFormer,
-        'BatteryMFormer_v2': BatteryMFormer_v2,
+        'CPTransformer_SameInput': CPTransformer_SameInput,
         'IC2ML': IC2ML,
         'ConvTimeNet': ConvTimeNet,
     }
