@@ -17,6 +17,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 warnings.filterwarnings('ignore')
+
+
 def collate_fn_soh(samples):
     """
     Custom collate function for SOH trajectory prediction
@@ -33,8 +35,8 @@ def collate_fn_soh(samples):
 
     soh_input = torch.vstack([i['soh_input'].unsqueeze(0) for i in samples])
     CEs = torch.vstack([i['CEs'].unsqueeze(0) for i in samples])
-    DESs = torch.vstack([i['DESs'].unsqueeze(0) for i in samples])
-    cycle_level_features = torch.cat([CEs, DESs], dim=-1)
+    EEs = torch.vstack([i['EEs'].unsqueeze(0) for i in samples])
+    cycle_level_features = torch.cat([CEs, EEs], dim=-1)
     soh_trajectory = torch.vstack([i['soh_trajectory'].unsqueeze(0) for i in samples])
     trajectory_mask = torch.vstack([i['trajectory_mask'].unsqueeze(0) for i in samples])
     life_labels = torch.tensor([i['eol_index'] for i in samples])
@@ -339,7 +341,6 @@ class Dataset_SOH_Forecasting(Dataset):
         # first break at position breaks[0], so first block ends at idxs[breaks[0]]
         return int(idxs[breaks[0]])
 
-
     def _prepare_charge_discharge_curves(self, file_name, cycle_data, nominal_capacity, start_soc, end_soc):
         """
         Prepare charge/discharge curves including SOC calculation.
@@ -625,10 +626,12 @@ class Dataset_SOH_Forecasting(Dataset):
             c = np.interp(target_soc[::-1], x, c_valid[::-1])[::-1]
             s = target_soc
 
-        return (self._sanitize_vector(v),
-                self._sanitize_vector(i),
-                self._sanitize_vector(c),
-                self._sanitize_vector(s))
+        return (
+            self._sanitize_vector(v),
+            self._sanitize_vector(i),
+            self._sanitize_vector(c),
+            self._sanitize_vector(s),
+        )
 
     def _capacity_based_resample(self, voltage, current, capacity, soc, target_length, is_charge=True):
         """
@@ -669,10 +672,12 @@ class Dataset_SOH_Forecasting(Dataset):
         resampled_soc = np.interp(target_norm, x, s_valid)
         resampled_capacity = target_norm * max_cap
 
-        return (self._sanitize_vector(resampled_voltage),
-                self._sanitize_vector(resampled_current),
-                self._sanitize_vector(resampled_capacity),
-                self._sanitize_vector(resampled_soc))
+        return (
+            self._sanitize_vector(resampled_voltage),
+            self._sanitize_vector(resampled_current),
+            self._sanitize_vector(resampled_capacity),
+            self._sanitize_vector(resampled_soc),
+        )
 
     def _fast_resample(self, curve, target_length):
         if len(curve) == 0:
@@ -738,7 +743,7 @@ class Dataset_SOH_Forecasting(Dataset):
             valid_cycle_number = len(data['cycle_data'])
 
             if self.input_mode == 'current_voltage':
-                curves, coulumbic_efficiencys, discharge_efficiencys = self._prepare_charge_discharge_curves(
+                curves, coulumbic_efficiencys, energy_efficiencys = self._prepare_charge_discharge_curves(
                     file_name, data['cycle_data'], nominal_capacity, start_soc, end_soc
                 )
 
@@ -763,14 +768,14 @@ class Dataset_SOH_Forecasting(Dataset):
 
                     soh_input = tmp_soh_trajectory[:self.early_cycle_threshold].copy()
                     ces = np.zeros(self.early_cycle_threshold)
-                    des = np.zeros(self.early_cycle_threshold)
+                    ees = np.zeros(self.early_cycle_threshold)
                     ces[:useable_cycle_number] = coulumbic_efficiencys[:useable_cycle_number]
-                    des[:useable_cycle_number] = discharge_efficiencys[:useable_cycle_number]
+                    ees[:useable_cycle_number] = energy_efficiencys[:useable_cycle_number]
                     soh_input[useable_cycle_number:] = 0
 
                     sample['soh_input'] = soh_input.reshape(-1, 1)
                     sample['CEs'] = ces.reshape(-1, 1)
-                    sample['DESs'] = des.reshape(-1, 1)
+                    sample['EEs'] = ees.reshape(-1, 1)
                     sample['soh_trajectory'] = padded_trajectory
                     sample['trajectory_mask'] = trajectory_mask
                     sample['eol_index'] = eol_cycle
@@ -781,8 +786,8 @@ class Dataset_SOH_Forecasting(Dataset):
             elif self.input_mode == 'soh_to_soh':
                 tmp_soh_trajectory = (soh_trajectory - eol_threshold) / (1.0 - eol_threshold)
 
-                # NOTE: In your original code, soh_to_soh branch still uses CE/DES, but they are not computed here.
-                # Keep it consistent with your original behavior: if you need CE/DES in this branch, compute curves first.
+                # NOTE: In your original code, soh_to_soh branch still uses CE/EE, but they are not computed here.
+                # Keep it consistent with your original behavior: if you need CE/EE in this branch, compute curves first.
                 # For now, we set them to zeros.
                 for useable_cycle_number in range(self.seq_len, self.early_cycle_threshold + 1):
                     if useable_cycle_number > valid_cycle_number:
@@ -794,10 +799,10 @@ class Dataset_SOH_Forecasting(Dataset):
                     soh_input[useable_cycle_number:] = 0
 
                     ces = np.zeros(self.early_cycle_threshold)
-                    des = np.zeros(self.early_cycle_threshold)
+                    ees = np.zeros(self.early_cycle_threshold)
 
                     sample['CEs'] = ces.reshape(-1, 1)
-                    sample['DESs'] = des.reshape(-1, 1)
+                    sample['EEs'] = ees.reshape(-1, 1)
                     sample['soh_input'] = soh_input.reshape(-1, 1)
 
                     padded_trajectory = np.zeros(self.max_trajectory_len)
@@ -814,7 +819,7 @@ class Dataset_SOH_Forecasting(Dataset):
                     self.samples.append(sample)
 
             elif self.input_mode == 'capacity_increment':
-                curves, coulumbic_efficiencys, discharge_efficiencys = self._prepare_charge_discharge_curves(
+                curves, coulumbic_efficiencys, energy_efficiencys = self._prepare_charge_discharge_curves(
                     file_name, data['cycle_data'], nominal_capacity, start_soc, end_soc
                 )
 
@@ -878,7 +883,7 @@ class Dataset_SOH_Forecasting(Dataset):
                 'eol_index': torch.FloatTensor([sample['eol_index']]),
                 'aging_condition_embedding': torch.FloatTensor(sample['aging_condition_embedding']),
                 'CEs': torch.FloatTensor(sample['CEs']),
-                'DESs': torch.FloatTensor(sample['DESs']),
+                'EEs': torch.FloatTensor(sample['EEs']),
                 'file_name': sample['file_name'],
             }
         elif self.input_mode == 'soh_to_soh':
@@ -889,7 +894,7 @@ class Dataset_SOH_Forecasting(Dataset):
                 'eol_index': torch.FloatTensor([sample['eol_index']]),
                 'aging_condition_embedding': torch.FloatTensor(sample['aging_condition_embedding']),
                 'CEs': torch.FloatTensor(sample['CEs']),
-                'DESs': torch.FloatTensor(sample['DESs']),
+                'EEs': torch.FloatTensor(sample['EEs']),
                 'file_name': sample['file_name'],
             }
         elif self.input_mode == 'capacity_increment':
