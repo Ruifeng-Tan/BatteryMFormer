@@ -115,6 +115,39 @@ visualization/
 CLAUDE.md
 
 # =========================
+# Rebuttal caches
+# =========================
+.cache_loao/
+.cache_liion_*/
+
+# =========================
+# Sync / vendor artifacts
+# =========================
+.remote_sync_*/
+.sync_backup_*/
+.tmp_remote_sync/
+.vendor_transformers/
+
+# =========================
+# Rebuttal working notes
+# =========================
+rebuttal.md
+rebuttal_full_backup_*.md
+meeting.md
+
+# =========================
+# Results
+# =========================
+results/
+
+# =========================
+# Rebuttal backup scripts
+# =========================
+train_eval_scripts/_rebuttal_backup/
+process_scripts/_rebuttal_backup/
+_rebuttal_backup/
+
+# =========================
 # Tests
 # =========================
 test/

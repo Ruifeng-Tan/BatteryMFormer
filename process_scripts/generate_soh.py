@@ -286,13 +286,13 @@ def main():
     parser.add_argument(
         '--cleaned_data_root',
         type=str,
-        default='/data/trf/python_works/BatteryLife/dataset',
+        default='/path/to/your/dataset',
         help='Root directory of cleaned_data'
     )
     parser.add_argument(
         '--output_root',
         type=str,
-        default='/data/trf/python_works/BatteryLife/dataset/SOH',
+        default='/path/to/your/dataset/SOH',
         help='Root directory for output (SOH)'
     )
     parser.add_argument(

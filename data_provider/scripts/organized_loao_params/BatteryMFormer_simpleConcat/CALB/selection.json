@@ -1,0 +1,13 @@
+{
+  "model": "BatteryMFormer_simpleConcat",
+  "dataset": "CALB",
+  "source_args": "/path/to/your/checkpoint",
+  "copied_args": "./data_provider/scripts/organized_loao_params/BatteryMFormer_simpleConcat/CALB/source_args.json",
+  "input_mode": "current_voltage",
+  "score_mape": 1.165578842163086,
+  "source_kind": "visperformance",
+  "selection": "fallback",
+  "notes": [
+    "inherited_from_model=BatteryMFormer"
+  ]
+}

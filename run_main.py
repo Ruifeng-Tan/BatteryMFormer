@@ -9,6 +9,8 @@ import time
 import json
 import random
 import pickle
+os.environ.setdefault("NCCL_P2P_DISABLE", "1")
+os.environ.setdefault("NCCL_IB_DISABLE", "1")
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error, mean_absolute_percentage_error
 from accelerate import Accelerator, DistributedDataParallelKwargs, DeepSpeedPlugin, load_checkpoint_in_model
 from accelerate.utils import set_seed as accelerate_set_seed
@@ -18,10 +20,46 @@ import joblib
 from models import PatchTST, iTransformer, DLinear, CPTransformer, CPMLP, BatteryMFormer
 from models import TimeMixerPP, IC2ML, PatchMLP
 from models import ConvTimeNet
+from models import TimeBridge
+from models import (
+    BatteryMFormer_simpleConcat,
+    BatteryMFormer_woACAttention,
+    BatteryMFormer_woACQuery,
+    BatteryMFormer_woACDecoder,
+    BatteryMFormer_woMDPM,
+    BatteryMFormer_woSOCView,
+    BatteryMFormer_v2,
+)
+from models import BatteryMFormer_structEmbed
+from models import CPTransformer_SOCAndConcat, iTransformer_SOCAndConcat
+from models import CPTransformer_SameInput
 import warnings
-import wandb  # <--- 1. 导入 wandb
+import wandb
+from pathlib import Path
 
 warnings.filterwarnings('ignore')
+
+BATTERYMFORMER_LOSS_MODELS = {
+    'BatteryMFormer',
+    'BatteryMFormer_structEmbed',
+    'BatteryMFormer_simpleConcat',
+    'BatteryMFormer_woACAttention',
+    'BatteryMFormer_woACQuery',
+    'BatteryMFormer_woACDecoder',
+    'BatteryMFormer_woSOCView',
+    'BatteryMFormer_v2',
+}
+
+
+def parse_wandb_tags(tags):
+    """Parse a comma-separated tag string into a clean list."""
+    if not tags:
+        return None
+    if isinstance(tags, (list, tuple)):
+        cleaned = [str(tag).strip() for tag in tags if str(tag).strip()]
+        return cleaned or None
+    cleaned = [tag.strip() for tag in str(tags).split(',') if tag.strip()]
+    return cleaned or None
 
 def print_detailed_parameters(model, accelerator):
     total_params = 0
@@ -70,8 +108,20 @@ def get_model(args):
         'TimeMixerPP': TimeMixerPP,
         'PatchMLP': PatchMLP,
         'BatteryMFormer': BatteryMFormer,
+        'BatteryMFormer_structEmbed': BatteryMFormer_structEmbed,
+        'BatteryMFormer_simpleConcat': BatteryMFormer_simpleConcat,
+        'BatteryMFormer_woACAttention': BatteryMFormer_woACAttention,
+        'BatteryMFormer_woACQuery': BatteryMFormer_woACQuery,
+        'BatteryMFormer_woACDecoder': BatteryMFormer_woACDecoder,
+        'BatteryMFormer_woMDPM': BatteryMFormer_woMDPM,
+        'BatteryMFormer_woSOCView': BatteryMFormer_woSOCView,
+        'BatteryMFormer_v2': BatteryMFormer_v2,
+        'CPTransformer_SOCAndConcat': CPTransformer_SOCAndConcat,
+        'CPTransformer_SameInput': CPTransformer_SameInput,
+        'iTransformer_SOCAndConcat': iTransformer_SOCAndConcat,
         'IC2ML': IC2ML,
         'ConvTimeNet': ConvTimeNet,
+        'TimeBridge': TimeBridge,
     }
 
     if args.model not in model_dict:
@@ -79,6 +129,25 @@ def get_model(args):
 
     model = model_dict[args.model].Model(args)
     return model
+
+
+def maybe_resume_model(model, args, accelerator):
+    """
+    If requested, load existing model weights from args.checkpoints/model.safetensors
+    before continuing training.
+    """
+    if not getattr(args, "resume_existing", False):
+        return False
+
+    ckpt_dir = Path(args.checkpoints)
+    state_path = ckpt_dir / "model.safetensors"
+    if not state_path.exists():
+        accelerator.print(f"[resume_existing] No model.safetensors found in {ckpt_dir}, starting from scratch.")
+        return False
+
+    load_checkpoint_in_model(model, str(ckpt_dir))
+    accelerator.print(f"[resume_existing] Loaded existing weights from {state_path}")
+    return True
 
 
 def masked_mse_loss(pred, target, mask):
@@ -203,7 +272,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
     test_losses = []
     test_metrics_history = {'mape': [], 'rmse': [], 'mae': []}
     
-    # 新增：记录最佳验证MAPE对应的指标
+    # Track best validation MAPE and corresponding metrics
     best_val_mape = float('inf')
     best_epoch_info = {
         'epoch': 0,
@@ -215,7 +284,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
         'val_rmse': 0.0
     }
     
-    # 新增：记录最后一个epoch的训练指标
+    # Track final epoch training metrics
     final_train_metrics = {
         'avg_train_loss': 0.0,
         'train_mape': 0.0,
@@ -249,7 +318,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
             else:
                 outputs, recovery_loss, life_pred_loss, embedding_alignment_loss, aug_loss = model(soh_input=soh_input)
 
-            if args.model in ['BatteryMFormer']:
+            if args.model in BATTERYMFORMER_LOSS_MODELS:
                 loss = criterion(outputs, soh_trajectory, trajectory_mask) + args.lambda_recovery * recovery_loss + args.lambda_mem * embedding_alignment_loss 
             else:
                 loss = criterion(outputs, soh_trajectory, trajectory_mask)
@@ -275,7 +344,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
             # Print progress occasionally
             print_freq = 1 if len(train_loader) < 10 else 100
             if batch_idx % print_freq == 0:
-                if args.model in ['BatteryMFormer']:
+                if args.model in BATTERYMFORMER_LOSS_MODELS:
                     accelerator.print(f'Epoch {epoch+1}/{args.train_epochs}, Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.6f}, Embedding Alignment Loss: {embedding_alignment_loss.item():.6f}, Recovery Loss: {recovery_loss.item():.6f}')
                 else:
                     accelerator.print(f'Epoch {epoch+1}/{args.train_epochs}, Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.6f}')
@@ -318,8 +387,8 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
             test_metrics_history['rmse'].append(test_rmse)
             test_metrics_history['mae'].append(test_mae)
             
-            # 新增：检查是否为最佳验证MAPE
-            # 使用 <= 与 EarlyStopping 保持一致，确保记录的metrics与保存的模型对应
+            # Update best validation MAPE
+            # Use <= to stay consistent with EarlyStopping behavior
             if val_mape <= best_val_mape:
                 best_val_mape = val_mape
                 best_epoch_info.update({
@@ -332,7 +401,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
                     'val_rmse': val_rmse
                 })
             
-            # 新增：更新最后一个epoch的训练指标
+            # Update final epoch training metrics
             final_train_metrics.update({
                 'avg_train_loss': avg_train_loss,
                 'train_mape': train_mape,
@@ -350,7 +419,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
             accelerator.print(f'  Val   -> Loss: {avg_val_loss:.6f}, MAPE: {val_mape:.2f}%, RMSE: {val_rmse:.6f}, MAE: {val_mae:.6f}')
             accelerator.print(f'  Test  -> Loss: {avg_test_loss:.6f}, MAPE: {test_mape:.2f}%, RMSE: {test_rmse:.6f}, MAE: {test_mae:.6f}')
             
-            # WandB Log: 记录所有指标
+            # Log all metrics to WandB
             wandb.log({
                 "epoch": epoch + 1,
                 # Training Metrics
@@ -388,19 +457,19 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
         accelerator.print("TRAINING SUMMARY")
         accelerator.print("="*80)
         
-        # 打印最佳验证MAPE对应的指标
+        # Print best validation MAPE and corresponding metrics
         accelerator.print(f"\nBest Validation MAPE at Epoch {best_epoch_info['epoch']}:")
         accelerator.print(f"  Validation -> MAPE: {best_epoch_info['val_mape']:.4f}%, MAE: {best_epoch_info['val_mae']:.6f}, RMSE: {best_epoch_info['val_rmse']:.6f}")
         accelerator.print(f"  Test       -> MAPE: {best_epoch_info['test_mape']:.4f}%, MAE: {best_epoch_info['test_mae']:.6f}, RMSE: {best_epoch_info['test_rmse']:.6f}")
         
-        # 打印最后一个epoch的训练指标
+        # Print final epoch training metrics
         accelerator.print(f"\nFinal Epoch (Epoch {epoch+1}) Training Metrics:")
         accelerator.print(f"  Loss: {final_train_metrics['avg_train_loss']:.6f}")
         accelerator.print(f"  MAPE: {final_train_metrics['train_mape']:.2f}%")
         accelerator.print(f"  MAE:  {final_train_metrics['train_mae']:.6f}")
         accelerator.print(f"  RMSE: {final_train_metrics['train_rmse']:.6f}")
         
-        # 保存重要指标到wandb的summary
+        # Save key metrics to WandB summary
         wandb.run.summary["best_val_mape_epoch"] = best_epoch_info['epoch']
         wandb.run.summary["best_val_mape"] = best_epoch_info['val_mape']
         wandb.run.summary["best_val_mae_at_best_val"] = best_epoch_info['val_mae']
@@ -428,13 +497,23 @@ def main():
     # Dataset parameters
     parser.add_argument('--dataset', type=str, default='MIX_large',
                         help='Dataset name')
-    parser.add_argument('--root_path', type=str, default='/ai/dl_project/MemoryNet/dataset/cleaned_data',
+    parser.add_argument('--root_path', type=str, default='./dataset',
                         help='Root path of dataset')
-    parser.add_argument('--processed_SOH_path', type=str, default='/ai/dl_project/MemoryNet/dataset/Trajectory_forecasting/processed_SOH',
+    parser.add_argument('--processed_SOH_path', type=str, default='./dataset/processed_SOH',
                         help='Root path of processed SOH trajectories')
     parser.add_argument('--input_mode', type=str, default='current_voltage',
                         choices=['current_voltage', 'soh_to_soh', 'capacity_increment'],
                         help='Input mode for model')
+    parser.add_argument('--split_json_path', type=str, default='',
+                        help='Explicit split json path. Overrides dataset/seed-based split lookup.')
+    parser.add_argument('--split_tag', type=str, default='',
+                        help='Short tag to isolate caches/checkpoints for custom splits.')
+    parser.add_argument('--prompt_embeddings_path', type=str, default='',
+                        help='Optional prompt embedding pickle path. Defaults to data_provider/prompt_embeddings/Qwen3_total.pkl')
+    parser.add_argument('--structured_metadata_path', type=str, default='',
+                        help='Optional structured metadata json path for learnable condition embedding experiments')
+    parser.add_argument('--structured_embed_dim', type=int, default=32,
+                        help='Embedding dimension per structured metadata field')
 
     # SOH truncation parameters
     parser.add_argument('--eol_threshold', type=float, default=0.8,
@@ -537,12 +616,20 @@ def main():
     parser.add_argument('--lambda_life_loss', type=float, default=0.1,
                         help='Loss weight for life prediction')
     # Cache and resume parameters
-    parser.add_argument('--cache_root', type=str, default='/ai/dl_project/MemoryNet/.cache',
+    parser.add_argument('--cache_root', type=str, default='./.cache',
                         help='Root directory for cache')
     parser.add_argument('--force_reload', action='store_true',
                         help='Force reload data from disk (ignore cache)')
     parser.add_argument('--resume_existing', action='store_true',
                         help='Resume training from existing checkpoint')
+    parser.add_argument('--wandb_project', type=str, default='BattMFormer_paper',
+                        help='Weights & Biases project name')
+    parser.add_argument('--wandb_group', type=str, default='',
+                        help='Weights & Biases group name')
+    parser.add_argument('--wandb_name', type=str, default='',
+                        help='Weights & Biases run name')
+    parser.add_argument('--wandb_tags', type=str, default='',
+                        help='Comma-separated Weights & Biases tags')
 
     # Additional model-specific parameters
     parser.add_argument('--factor', type=int, default=1,
@@ -673,18 +760,27 @@ def main():
     accelerator.print(f'Dataset: {args.dataset}')
     accelerator.print(f'Mixed Precision: {accelerator.mixed_precision}')
 
-    # <--- 3. WandB Init: 初始化项目并上传 args (只在主进程执行)
+    # Initialize WandB (main process only)
     if accelerator.is_main_process:
+        wandb_name = args.wandb_name or f"{args.model}_{args.dataset}"
+        wandb_kwargs = {
+            'project': args.wandb_project,
+            'config': args.__dict__,
+            'name': wandb_name,
+        }
+        if args.wandb_group:
+            wandb_kwargs['group'] = args.wandb_group
+        wandb_tags = parse_wandb_tags(args.wandb_tags)
+        if wandb_tags is not None:
+            wandb_kwargs['tags'] = wandb_tags
         wandb.init(
-            project="BattMFormer_paper",
-            config=args.__dict__,  # 将 args 转为 dict 上传
-            name=f"{args.model}_{args.dataset}"  # 给 run 起个名字，方便区分
+            **wandb_kwargs
         )
-    # <--- End WandB Init
 
     # Get model
     accelerator.print(args)
     model = get_model(args)
+    maybe_resume_model(model, args, accelerator)
 
     # Print model info (only on main process)
     if accelerator.is_main_process:
@@ -765,9 +861,8 @@ def main():
         accelerator.print(f'Training history saved to {history_path}')
 
     accelerator.set_trigger()
-    if accelerator.check_trigger() and accelerator.is_local_main_process:
+    if accelerator.check_trigger() and accelerator.is_local_main_process and wandb.run is not None:
         wandb.finish()
-        # <--- End WandB Finish
 
 
 if __name__ == '__main__':

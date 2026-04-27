@@ -16,16 +16,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 1. Path Configuration
 # Path to cleaned_data directory (contains battery pkl files)
-INPUT_DIR="/data/trf/python_works/BatteryLife/dataset"
+INPUT_DIR="/path/to/your/dataset"
 # Intermediate SOH output directory
-SOH_DIR="/data/trf/python_works/BatteryLife/dataset/SOH"
+SOH_DIR="/path/to/your/dataset/SOH"
 # Final processed SOH output directory
-OUTPUT_DIR="/data/trf/python_works/BatteryLife/dataset/processed_SOH"
+OUTPUT_DIR="/path/to/your/dataset/processed_SOH"
 # Path to CALB cycling data (used in Step 1)
-CALB_CAPACITY_FILE="/data/trf/python_works/Trajectory_forecasting/process_scripts/overall_CALB_cycling_data.xlsx"
+CALB_CAPACITY_FILE="$SCRIPT_DIR/overall_CALB_cycling_data.xlsx"
 # Path to raw ISU_ILCC dataset (all zip files should be unzipped)
 # Set to "" to skip ISU_ILCC conversion in Step 0
-ISU_ILCC_RAW_DIR="/data/trf/raw_ISU"
+ISU_ILCC_RAW_DIR="/path/to/your/raw_ISU"
 
 # 2. Pipeline Options
 # Python command (e.g., "python" or "conda run -n battery python")

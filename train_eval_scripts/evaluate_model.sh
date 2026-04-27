@@ -19,8 +19,10 @@ master_port=29100
 # ==========================================
 # Path to the checkpoint directory (must contain args.json, model weights, label_scaler)
 args_path=/path/to/your/checkpoint
-# Target dataset to evaluate on (Li_ion, CALB, NA-ion, ZN-coin)
-target_dataset=Li_ion
+# Target dataset to evaluate on (NA-ion, CALB, Li_ion, ZN-coin, etc.)
+# This should match the dataset used during training.
+# For LOAO evaluation, the split_json_path is loaded from the checkpoint's args.json.
+target_dataset=NA-ion
 
 # ==========================================
 # 3. Execution Command

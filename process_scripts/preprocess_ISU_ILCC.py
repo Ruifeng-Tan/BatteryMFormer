@@ -303,10 +303,10 @@ def process_battery(args):
 def main():
     parser = argparse.ArgumentParser(description='ISU_ILCC SOH PCHIP Smoothing')
     parser.add_argument('--input', type=str,
-                        default='/ai/dl_project/MemoryNet/dataset/SOH/ISU_ILCC',
+                        default='/path/to/your/dataset/SOH/ISU_ILCC',
                         help='Input directory with raw SOH pkl files')
     parser.add_argument('--output', type=str,
-                        default='/ai/dl_project/MemoryNet/dataset/processed_SOH/ISU_ILCC',
+                        default='/path/to/your/dataset/processed_SOH/ISU_ILCC',
                         help='Output directory for smoothed SOH pkl files')
     parser.add_argument('--rpt_json', type=str,
                         default='all_rpt_positions.json',

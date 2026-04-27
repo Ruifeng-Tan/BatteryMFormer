@@ -209,38 +209,37 @@ class BattMEncoderLayer(nn.Module):
     def forward(self, x, condition_embed, attn_mask=None, tau=None, delta=None):
         # -------------------------------------------------------
         # Block 1: Self-Attention (Pre-Norm)
-        # 结构: x = x + Attention(Norm(x))
+        # x = x + Attention(Norm(x))
         # -------------------------------------------------------
-        
-        # 1. 先进行归一化 (Pre-Norm)
+
+        # Pre-norm
         x_norm1 = self.norm1(x)
-        
-        # 2. 将归一化后的数据传入 Attention
+
+        # Attention on normalized input
         new_x, attn = self.attention(
-            x_norm1, x_norm1, x_norm1, # Q, K, V 都使用 norm 后的数据
+            x_norm1, x_norm1, x_norm1, # Q, K, V all use normed data
             condition_query=condition_embed,
             attn_mask=attn_mask,
             tau=tau, delta=delta
         )
-        
-        # 3. 残差连接 (原始 x + Attention 输出)
+
+        # Residual connection
         x = x + self.dropout(new_x)
 
         # -------------------------------------------------------
         # Block 2: Feed Forward (Pre-Norm)
-        # 结构: x = x + FFN(Norm(x))
+        # x = x + FFN(Norm(x))
         # -------------------------------------------------------
-        
-        # 1. 先进行归一化
+
+        # Pre-norm
         x_norm2 = self.norm2(x)
-        
-        # 2. FFN 计算 (使用归一化后的 x_norm2)
+
+        # FFN (Conv1d requires (Batch, Channel, Seq), so transpose)
         y = x_norm2
-        # 注意：Conv1d 需要 (Batch, Channel, Seq)，所以需要 transpose
         y = self.dropout(self.activation(self.conv1(y.transpose(-1, 1))))
         y = self.dropout(self.conv2(y).transpose(-1, 1))
 
-        # 3. 残差连接 (上一步的 x + FFN 输出)
+        # Residual connection
         x = x + y
 
         return x, attn

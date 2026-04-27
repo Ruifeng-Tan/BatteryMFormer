@@ -121,7 +121,7 @@ class Dataset_SOH_Forecasting(Dataset):
             'ZN-coin_430-3_20231212185323_03_2.pkl'
         ]
         self.random_seed = args.seed
-        self.root_path = args.root_path if hasattr(args, 'root_path') else '/ai/dl_project/MemoryNet/dataset/cleaned_data'
+        self.root_path = args.root_path if hasattr(args, 'root_path') else './dataset'
         self.processed_SOH_path = args.processed_SOH_path
         self.dataset_name = args.dataset
         self.early_cycle_threshold = args.early_cycle_threshold if hasattr(args, 'early_cycle_threshold') else 100
@@ -139,13 +139,22 @@ class Dataset_SOH_Forecasting(Dataset):
 
         # Cache
         cache_key = self._get_cache_key()
-        cache_root = './.cache'
-        os.makedirs(cache_root, exist_ok=True)
-        cache_file = f"{cache_root}/{cache_key}.pkl"
+        self.cache_root = getattr(args, 'cache_root', './.cache') or './.cache'
+        os.makedirs(self.cache_root, exist_ok=True)
+        cache_file = os.path.join(self.cache_root, f"{cache_key}.pkl")
+        cache_candidates = self._get_cache_candidates(cache_key)
 
-        if os.path.exists(cache_file) and not getattr(args, 'force_reload', False):
-            print(f"Loading preprocessed data from cache: {cache_file}")
-            with open(cache_file, 'rb') as f:
+        if not getattr(args, 'force_reload', False):
+            existing_cache = next((path for path in cache_candidates if os.path.exists(path)), None)
+        else:
+            existing_cache = None
+
+        if existing_cache is not None:
+            if existing_cache != cache_file:
+                print(f"Loading compatible legacy cache: {existing_cache}")
+            else:
+                print(f"Loading preprocessed data from cache: {existing_cache}")
+            with open(existing_cache, 'rb') as f:
                 self.samples = pickle.load(f)
         else:
             print(f"Preprocessing data for {self.dataset_name} {flag} {input_mode}...")
@@ -210,14 +219,61 @@ class Dataset_SOH_Forecasting(Dataset):
             f"{self.early_cycle_threshold}_{self.charge_discharge_len}_{self.seq_len}_{self.max_trajectory_len}_"
             f"capresample{self.use_capacity_resample}_v3_soc_alignchk{int(self.alignment_check)}"
         )
+        prompt_embeddings_path = getattr(self.args, 'prompt_embeddings_path', '')
+        if prompt_embeddings_path:
+            prompt_tag = Path(prompt_embeddings_path).stem
+            if prompt_tag and prompt_tag != 'Qwen3_total':
+                key_str += f"_prompt{prompt_tag}"
+        structured_metadata_path = getattr(self.args, 'structured_metadata_path', '')
+        if structured_metadata_path:
+            struct_tag = Path(structured_metadata_path).stem
+            key_str += f"_struct{struct_tag}"
+        split_tag = getattr(self.args, 'split_tag', None)
+        split_json_path = getattr(self.args, 'split_json_path', None)
+        if not split_tag and split_json_path:
+            split_tag = Path(split_json_path).stem
+        if split_tag:
+            key_str += f"_split{split_tag}"
         fewshot_ratio = getattr(self.args, 'fewshot_ratio', None)
         if fewshot_ratio and self.flag == 'train' and 0 < fewshot_ratio < 1:
             key_str += f"_fewshot{int(fewshot_ratio * 100)}"
         return key_str
 
+    def _get_cache_candidates(self, cache_key):
+        """Return preferred and backward-compatible cache paths.
+
+        Older cache files may not include the alignment-check suffix, or may have
+        been created with `alignchk0`. When the current key misses, we still
+        prefer loading those legacy caches instead of reprocessing the dataset.
+        """
+        candidates = [os.path.join(self.cache_root, f"{cache_key}.pkl")]
+
+        if '_v3_soc_alignchk' in cache_key:
+            prefix, suffix = cache_key.split('_v3_soc_alignchk', 1)
+            remainder = suffix[1:] if suffix and suffix[0].isdigit() else suffix
+            legacy_keys = [
+                f"{prefix}_v3_soc_alignchk0{remainder}",
+                f"{prefix}_v3_soc{remainder}",
+            ]
+            for legacy_key in legacy_keys:
+                candidates.append(os.path.join(self.cache_root, f"{legacy_key}.pkl"))
+
+        # Preserve order while removing duplicates.
+        deduped = []
+        seen = set()
+        for candidate in candidates:
+            if candidate not in seen:
+                deduped.append(candidate)
+                seen.add(candidate)
+        return deduped
+
     def _load_data_files(self):
+        explicit_split_json = getattr(self.args, 'split_json_path', None)
         fewshot_ratio = getattr(self.args, 'fewshot_ratio', None)
-        if fewshot_ratio and self.flag == 'train' and 0 < fewshot_ratio < 1:
+        if explicit_split_json:
+            split_json = explicit_split_json
+            print(f"Using explicit split json: {split_json}")
+        elif fewshot_ratio and self.flag == 'train' and 0 < fewshot_ratio < 1:
             fewshot_pct = int(fewshot_ratio * 100)
             if self.dataset_name != 'Li_ion':
                 split_json = f'./data_provider/split_json/fewshot/{self.dataset_name}_split_{self.random_seed}_fewshot{fewshot_pct}.json'
@@ -683,9 +739,18 @@ class Dataset_SOH_Forecasting(Dataset):
         return self._sanitize_vector(np.interp(new_idx, old_idx, curve))
 
     def _prepare_samples(self):
-        Qwen3_aging_condition_embeddings = pickle.load(
-            open('data_provider/prompt_embeddings/Qwen3_total.pkl', 'rb')
-        )
+        structured_metadata_path = getattr(self.args, 'structured_metadata_path', '')
+        if structured_metadata_path:
+            structured_meta = json.load(open(structured_metadata_path, 'r'))
+            structured_fields = structured_meta['fields']
+            structured_records = structured_meta['records']
+            Qwen3_aging_condition_embeddings = None
+        else:
+            prompt_embeddings_path = getattr(self.args, 'prompt_embeddings_path', '') or 'data_provider/prompt_embeddings/Qwen3_total.pkl'
+            Qwen3_aging_condition_embeddings = pickle.load(open(prompt_embeddings_path, 'rb'))
+            structured_meta = None
+            structured_fields = None
+            structured_records = None
 
         total_life_labels = []
         print('Files:', len(self.files))
@@ -734,7 +799,14 @@ class Dataset_SOH_Forecasting(Dataset):
             if nominal_capacity is None or not np.isfinite(nominal_capacity) or nominal_capacity <= 0:
                 raise Exception(f'{file_name} should have nominal capacity in Ah!')
 
-            aging_condition_embedding_for_this_cell = Qwen3_aging_condition_embeddings[file_name]
+            if structured_records is not None:
+                meta = structured_records[file_name]
+                aging_condition_embedding_for_this_cell = np.array(
+                    [meta[field] for field in structured_fields],
+                    dtype=np.int64,
+                )
+            else:
+                aging_condition_embedding_for_this_cell = Qwen3_aging_condition_embeddings[file_name]
             valid_cycle_number = len(data['cycle_data'])
 
             if self.input_mode == 'current_voltage':
@@ -876,7 +948,7 @@ class Dataset_SOH_Forecasting(Dataset):
                 'curve_attn_mask': torch.FloatTensor(sample['curve_attn_mask']),
                 'soh_input': torch.FloatTensor(sample['soh_input']),
                 'eol_index': torch.FloatTensor([sample['eol_index']]),
-                'aging_condition_embedding': torch.FloatTensor(sample['aging_condition_embedding']),
+                'aging_condition_embedding': torch.tensor(sample['aging_condition_embedding']),
                 'CEs': torch.FloatTensor(sample['CEs']),
                 'DESs': torch.FloatTensor(sample['DESs']),
                 'file_name': sample['file_name'],
@@ -887,7 +959,7 @@ class Dataset_SOH_Forecasting(Dataset):
                 'trajectory_mask': torch.FloatTensor(sample['trajectory_mask']),
                 'soh_input': torch.FloatTensor(sample['soh_input']),
                 'eol_index': torch.FloatTensor([sample['eol_index']]),
-                'aging_condition_embedding': torch.FloatTensor(sample['aging_condition_embedding']),
+                'aging_condition_embedding': torch.tensor(sample['aging_condition_embedding']),
                 'CEs': torch.FloatTensor(sample['CEs']),
                 'DESs': torch.FloatTensor(sample['DESs']),
                 'file_name': sample['file_name'],

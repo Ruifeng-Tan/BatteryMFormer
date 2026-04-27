@@ -44,20 +44,20 @@ class RoPEAttention(nn.Module):
         # (max_len, 1)
         position = torch.arange(0, max_len, dtype=dtype).unsqueeze(-1)
         # (output_dim//2)
-        ids = torch.arange(0, output_dim // 2, dtype=dtype)  # 即公式里的i, i的范围是 [0,d/2]
+        ids = torch.arange(0, output_dim // 2, dtype=dtype)  # i in [0, d/2]
         theta = torch.pow(10000, -2 * ids / output_dim)
 
         # (max_len, output_dim//2)
-        embeddings = position * theta  # 即公式里的：pos / (10000^(2i/d))
+        embeddings = position * theta  # pos / (10000^(2i/d))
 
         # (max_len, output_dim//2, 2)
         embeddings = torch.stack([torch.sin(embeddings), torch.cos(embeddings)], dim=-1)
 
         # (bs, head, max_len, output_dim//2, 2)
-        embeddings = embeddings.repeat((batch_size, nums_head, *([1] * len(embeddings.shape))))  # 在bs维度重复，其他维度都是1不重复
+        embeddings = embeddings.repeat((batch_size, nums_head, *([1] * len(embeddings.shape))))
 
         # (bs, head, max_len, output_dim)
-        # reshape后就是：偶数sin, 奇数cos了
+        # Interleaved: even=sin, odd=cos
         embeddings = torch.reshape(embeddings, (batch_size, nums_head, max_len, output_dim))
         embeddings = embeddings.to(device)
         return embeddings
@@ -74,22 +74,22 @@ class RoPEAttention(nn.Module):
 
 
         # cos_pos,sin_pos: (bs, head, max_len, output_dim)
-        # 看rope公式可知，相邻cos，sin之间是相同的，所以复制一遍。如(1,2,3)变成(1,1,2,2,3,3)
-        cos_pos = pos_emb[...,  1::2].repeat_interleave(2, dim=-1)  # 将奇数列信息抽取出来也就是cos 拿出来并复制
-        sin_pos = pos_emb[..., ::2].repeat_interleave(2, dim=-1)  # 将偶数列信息抽取出来也就是sin 拿出来并复制
+        # Adjacent cos/sin pairs are identical, so repeat_interleave: (1,2,3) -> (1,1,2,2,3,3)
+        cos_pos = pos_emb[...,  1::2].repeat_interleave(2, dim=-1)  # extract odd cols (cos) and duplicate
+        sin_pos = pos_emb[..., ::2].repeat_interleave(2, dim=-1)  # extract even cols (sin) and duplicate
 
         # q,k: (bs, head, max_len, output_dim)
         q2 = torch.stack([-q[..., 1::2], q[..., ::2]], dim=-1)
-        q2 = q2.reshape(q.shape)  # reshape后就是正负交替了
+        q2 = q2.reshape(q.shape)  # alternating sign pattern
 
 
 
-        # 更新qw, *对应位置相乘
+        # Update q with RoPE
         q = q * cos_pos + q2 * sin_pos
 
         k2 = torch.stack([-k[..., 1::2], k[..., ::2]], dim=-1)
         k2 = k2.reshape(k.shape)
-        # 更新kw, *对应位置相乘
+        # Update k with RoPE
         k = k * cos_pos + k2 * sin_pos
 
         return q, k

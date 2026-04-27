@@ -1,0 +1,11 @@
+{
+  "model": "ConvTimeNet",
+  "dataset": "NA-ion",
+  "source_args": "/path/to/your/checkpoint",
+  "copied_args": "./data_provider/scripts/organized_loao_params/ConvTimeNet/NA-ion/source_args.json",
+  "input_mode": "current_voltage",
+  "score_mape": 1.2121526524424553,
+  "source_kind": "backup",
+  "selection": "direct",
+  "notes": []
+}

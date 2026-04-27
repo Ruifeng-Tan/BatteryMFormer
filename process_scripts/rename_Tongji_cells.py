@@ -1,12 +1,10 @@
 import os
 import argparse
 
-# --- 修改 1: 添加参数解析，接收外部传入的 output_dir ---
 parser = argparse.ArgumentParser(description="Rename Tongji dataset files")
 parser.add_argument('--output_dir', type=str, required=True, help='Path to processed_SOH directory')
 args = parser.parse_args()
 
-# 使用传入的路径，而不是硬编码
 processed_SOH_dir = args.output_dir
 total_datasets = ['Tongji']
 

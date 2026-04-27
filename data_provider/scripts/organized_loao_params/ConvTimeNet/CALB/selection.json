@@ -1,0 +1,11 @@
+{
+  "model": "ConvTimeNet",
+  "dataset": "CALB",
+  "source_args": "/path/to/your/checkpoint",
+  "copied_args": "./data_provider/scripts/organized_loao_params/ConvTimeNet/CALB/source_args.json",
+  "input_mode": "current_voltage",
+  "score_mape": 1.5821903944015503,
+  "source_kind": "backup",
+  "selection": "direct",
+  "notes": []
+}

@@ -1,0 +1,11 @@
+{
+  "model": "CPTransformer",
+  "dataset": "CALB",
+  "source_args": "/path/to/your/checkpoint",
+  "copied_args": "./data_provider/scripts/organized_loao_params/CPTransformer/CALB/source_args.json",
+  "input_mode": "current_voltage",
+  "score_mape": 1.989511214196682,
+  "source_kind": "fewshot",
+  "selection": "direct",
+  "notes": []
+}

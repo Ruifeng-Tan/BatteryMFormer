@@ -9,7 +9,7 @@ data_split_json_files = [i for i in data_split_json_files if not i.startswith('S
 
 # get all labeled sample names
 # tongji: -#
-procssed_soh_path = '/data/trf/python_works/BatteryLife/dataset/processed_SOH'
+procssed_soh_path = '/path/to/your/processed_SOH'
 dataset_names = ['CALB', 'NA-ion', 'ZN-coin', 'CALCE', 'HNEI', 'HUST', 'ISU_ILCC', 'MATR', 'MICH', 'MICH_EXP', 'RWTH', 'SNL', 'Stanford_2',
 'Tongji', 'UL_PUR', 'XJTU']
 

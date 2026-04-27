@@ -24,10 +24,10 @@ import warnings
 
 
 # Configuration
-BASE_DIR = Path('/ai/dl_project/MemoryNet/dataset/ISU_ILCC')
+BASE_DIR = Path('/path/to/your/ISU_ILCC')
 CYCLING_DIR = BASE_DIR / 'Cycling_json'
 RPT_DIR = BASE_DIR / 'RPT_json'
-OUTPUT_FILE = Path('/ai/dl_project/MemoryNet/process_scripts/all_rpt_positions.json')
+OUTPUT_FILE = Path('./process_scripts/all_rpt_positions.json')
 
 # Release 2.0 cells (updated data)
 RELEASE_2_CELLS = [

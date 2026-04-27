@@ -1,0 +1,13 @@
+{
+  "model": "BatteryMFormer_simpleConcat",
+  "dataset": "NA-ion",
+  "source_args": "/path/to/your/checkpoint",
+  "copied_args": "./data_provider/scripts/organized_loao_params/BatteryMFormer_simpleConcat/NA-ion/source_args.json",
+  "input_mode": "current_voltage",
+  "score_mape": 0.8544341661036015,
+  "source_kind": "visperformance",
+  "selection": "fallback",
+  "notes": [
+    "inherited_from_model=BatteryMFormer"
+  ]
+}

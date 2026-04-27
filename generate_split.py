@@ -8,7 +8,7 @@ import math
 random_seed = 2024
 random.seed(random_seed)
 
-processed_SOH_dir = '/data/trf/python_works/BatteryLife/dataset/processed_SOH'
+processed_SOH_dir = '/path/to/your/processed_SOH'
 total_datasets = ['CALB', 'NA-ion', 'ZN-coin', 'CALCE', 'HNEI', 'HUST', 'ISU_ILCC', 'MATR', 'RWTH', 'SNL', 'Stanford_2', 'Tongji', 'total_MICH', 'UL_PUR', 'XJTU']
 
 train_cells = []

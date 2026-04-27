@@ -174,13 +174,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--raw_data_file_path',
         type=str,
-        default='/data/trf/python_works/BatteryLife/dataset/',
+        default='/path/to/your/dataset/',
         help='Root directory of cleaned_data'
     )
     parser.add_argument(
         '--output_path',
         type=str,
-        default='/data/trf/python_works/BatteryLife/dataset/Trajectory_forecasting/SOH',
+        default='/path/to/your/dataset/SOH',
         help='Root directory for output (processed_SOH)'
     )
     args = parser.parse_args()

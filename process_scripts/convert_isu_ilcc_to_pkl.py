@@ -92,8 +92,8 @@ CYCLING_RATES = {
 }
 
 # Default paths (can be overridden by command line arguments)
-DEFAULT_BASE_DIR = Path('/data/trf/raw_ISU')
-DEFAULT_OUTPUT_DIR = Path('/data/trf/python_works/BatteryLife/dataset')
+DEFAULT_BASE_DIR = Path('/path/to/your/raw_ISU')
+DEFAULT_OUTPUT_DIR = Path('/path/to/your/dataset')
 
 # Battery specifications
 NOMINAL_CAPACITY = 0.25  # 250 mAh = 0.25 Ah

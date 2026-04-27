@@ -17,6 +17,16 @@ seed=2024
 model_name=PatchTST
 dataset=NA-ion
 input_mode=current_voltage  # Options: current_voltage or soh_to_soh
+# ---------- Evaluation Protocol ----------
+# We use Leave-One-Aging-condition-Out (LOAO) evaluation by default.
+# Each split holds out one aging condition for testing.
+# Available LOAO splits:
+#   CALB:   data_provider/split_json/loao/CALB_loao_cond{396..399}_valseed2024.json  (4 folds)
+#   NA-ion: data_provider/split_json/loao/NA-ion_loao_cond{400..411}_valseed2024.json (12 folds)
+# For Li-ion pure-OOD evaluation:
+#   data_provider/split_json/liion_pure_ood/Li_ion_pure_ood_seed{2021,42,2024}.json
+# To use the legacy random split, leave split_json_path empty.
+split_json_path=./data_provider/split_json/loao/NA-ion_loao_cond400_valseed2024.json
 
 # ==========================================
 # 3. Model Architecture Hyperparameters
@@ -60,7 +70,8 @@ root_path=/path/to/your/dataset
 processed_SOH_path=/path/to/your/processed_SOH
 cache_root=/path/to/your/cache
 
-checkpoints="./checkpoints/${model_name}_${dataset}_${input_mode}_dm${d_model}_el${e_layers}_dff${d_ff}_bs${batch_size}_dr${dropout}_lr${learning_rate}_seed${seed}"
+split_tag=$(basename "$split_json_path" .json)
+checkpoints="./checkpoints/${model_name}_${dataset}_${split_tag}_${input_mode}_dm${d_model}_el${e_layers}_dff${d_ff}_bs${batch_size}_dr${dropout}_lr${learning_rate}_seed${seed}"
 
 # ==========================================
 # 7. Execution Command
@@ -77,6 +88,8 @@ CUDA_VISIBLE_DEVICES=$gpu_ids accelerate launch \
   --processed_SOH_path $processed_SOH_path \
   --checkpoints $checkpoints \
   --input_mode $input_mode \
+  --split_json_path $split_json_path \
+  --split_tag $split_tag \
   --batch_size $batch_size \
   --train_epochs $train_epochs \
   --learning_rate $learning_rate \

@@ -1,0 +1,11 @@
+{
+  "model": "CPMLP",
+  "dataset": "NA-ion",
+  "source_args": "/path/to/your/checkpoint",
+  "copied_args": "./data_provider/scripts/organized_loao_params/CPMLP/NA-ion/source_args.json",
+  "input_mode": "current_voltage",
+  "score_mape": 1.270365435630083,
+  "source_kind": "finetune",
+  "selection": "direct",
+  "notes": []
+}

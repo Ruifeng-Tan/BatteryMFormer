@@ -1,0 +1,11 @@
+{
+  "model": "PatchMLP",
+  "dataset": "CALB",
+  "source_args": "/path/to/your/checkpoint",
+  "copied_args": "./data_provider/scripts/organized_loao_params/PatchMLP/CALB/source_args.json",
+  "input_mode": "current_voltage",
+  "score_mape": null,
+  "source_kind": "checkpoints",
+  "selection": "direct",
+  "notes": []
+}
