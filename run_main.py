@@ -21,18 +21,6 @@ from models import PatchTST, iTransformer, DLinear, CPTransformer, CPMLP, Batter
 from models import TimeMixerPP, IC2ML, PatchMLP
 from models import ConvTimeNet
 from models import TimeBridge
-from models import (
-    BatteryMFormer_simpleConcat,
-    BatteryMFormer_woACAttention,
-    BatteryMFormer_woACQuery,
-    BatteryMFormer_woACDecoder,
-    BatteryMFormer_woMDPM,
-    BatteryMFormer_woSOCView,
-    BatteryMFormer_v2,
-)
-from models import BatteryMFormer_structEmbed
-from models import CPTransformer_SOCAndConcat, iTransformer_SOCAndConcat
-from models import CPTransformer_SameInput
 import warnings
 import wandb
 from pathlib import Path
@@ -41,13 +29,6 @@ warnings.filterwarnings('ignore')
 
 BATTERYMFORMER_LOSS_MODELS = {
     'BatteryMFormer',
-    'BatteryMFormer_structEmbed',
-    'BatteryMFormer_simpleConcat',
-    'BatteryMFormer_woACAttention',
-    'BatteryMFormer_woACQuery',
-    'BatteryMFormer_woACDecoder',
-    'BatteryMFormer_woSOCView',
-    'BatteryMFormer_v2',
 }
 
 
@@ -108,17 +89,6 @@ def get_model(args):
         'TimeMixerPP': TimeMixerPP,
         'PatchMLP': PatchMLP,
         'BatteryMFormer': BatteryMFormer,
-        'BatteryMFormer_structEmbed': BatteryMFormer_structEmbed,
-        'BatteryMFormer_simpleConcat': BatteryMFormer_simpleConcat,
-        'BatteryMFormer_woACAttention': BatteryMFormer_woACAttention,
-        'BatteryMFormer_woACQuery': BatteryMFormer_woACQuery,
-        'BatteryMFormer_woACDecoder': BatteryMFormer_woACDecoder,
-        'BatteryMFormer_woMDPM': BatteryMFormer_woMDPM,
-        'BatteryMFormer_woSOCView': BatteryMFormer_woSOCView,
-        'BatteryMFormer_v2': BatteryMFormer_v2,
-        'CPTransformer_SOCAndConcat': CPTransformer_SOCAndConcat,
-        'CPTransformer_SameInput': CPTransformer_SameInput,
-        'iTransformer_SOCAndConcat': iTransformer_SOCAndConcat,
         'IC2ML': IC2ML,
         'ConvTimeNet': ConvTimeNet,
         'TimeBridge': TimeBridge,

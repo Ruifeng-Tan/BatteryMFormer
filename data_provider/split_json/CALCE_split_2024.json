@@ -1,1 +1,0 @@
-{"train": ["CALCE_CX2_16.pkl", "CALCE_CS2_37.pkl", "CALCE_CS2_36.pkl", "CALCE_CX2_35.pkl", "CALCE_CS2_38.pkl", "CALCE_CX2_33.pkl"], "val": ["CALCE_CS2_33.pkl", "CALCE_CS2_34.pkl", "CALCE_CS2_35.pkl"], "test": ["CALCE_CX2_38.pkl", "CALCE_CX2_34.pkl", "CALCE_CX2_37.pkl", "CALCE_CX2_36.pkl"]}

@@ -78,11 +78,11 @@ def condition_groups(dataset: str) -> Dict[int, List[str]]:
 
 
 def split_json_path(dataset: str, condition_id: int, val_seed: int = VAL_SPLIT_SEED) -> Path:
-    return SPLIT_DIR / f"{dataset}_loao_cond{condition_id}_valseed{val_seed}.json"
+    return SPLIT_DIR / f"{dataset}_loao_cond{condition_id}_seed{val_seed}.json"
 
 
 def split_tag(dataset: str, condition_id: int, val_seed: int = VAL_SPLIT_SEED) -> str:
-    return f"{dataset}_loao_cond{condition_id}_valseed{val_seed}"
+    return f"{dataset}_loao_cond{condition_id}_seed{val_seed}"
 
 
 def checkpoint_dir(dataset: str, condition_id: int) -> Path:
