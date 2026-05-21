@@ -69,6 +69,7 @@ Thumbs.db
 # =========================
 checkpoints/
 checkpoint_*/
+checkpoints_*/
 *.pth
 *.pt
 *.ckpt
@@ -121,6 +122,22 @@ CLAUDE.md
 .cache_liion_*/
 
 # =========================
+# Structured metadata (regenerated locally)
+# =========================
+data_provider/structured_metadata/
+
+# =========================
+# Internal data-prep / rescue / replay scripts (not for open-source)
+# =========================
+data_provider/scripts/
+
+# =========================
+# Few-shot splits (not for open-source)
+# =========================
+data_provider/split_json/fewshot/
+data_provider/split_json/fewshot_ood_*/
+
+# =========================
 # Sync / vendor artifacts
 # =========================
 .remote_sync_*/
@@ -154,3 +171,4 @@ test/
 test/*
 
 dataset_overview_calculation.py
+paper.tex

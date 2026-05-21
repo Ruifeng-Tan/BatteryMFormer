@@ -21,8 +21,8 @@ input_mode=current_voltage  # Options: current_voltage or soh_to_soh
 # We use Leave-One-Aging-condition-Out (LOAO) evaluation by default.
 # Each split holds out one aging condition for testing.
 # Available LOAO splits:
-#   CALB:   data_provider/split_json/loao/CALB_loao_cond{396..399}_seed2024.json  (4 folds)
-#   NA-ion: data_provider/split_json/loao/NA-ion_loao_cond{400..411}_seed2024.json (12 folds)
+#   CALB:   data_provider/split_json/loao/CALB_loao_cond{396..399}_seed{2021,42,2024}.json  (4 folds x 3 seeds)
+#   NA-ion: data_provider/split_json/loao/NA-ion_loao_cond{400..411}_seed{2021,42,2024}.json (12 folds x 3 seeds)
 # For Li-ion pure-OOD evaluation:
 #   data_provider/split_json/pure_ood/Liion_split_seed{2021,42,2024}.json
 # To use the legacy random split, leave split_json_path empty.

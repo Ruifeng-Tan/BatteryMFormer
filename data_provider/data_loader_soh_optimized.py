@@ -942,10 +942,24 @@ class Dataset_SOH_Forecasting(Dataset):
     def __len__(self):
         return len(self.samples)
 
+    @staticmethod
+    def _cycle_efficiency_features(sample):
+        ces = sample.get('CEs')
+        if ces is None:
+            curve_mask = sample.get('curve_attn_mask', [])
+            ces = np.ones((len(curve_mask), 1), dtype=np.float32)
+        ees = sample.get('EEs')
+        if ees is None:
+            ees = sample.get('DESs')
+        if ees is None:
+            ees = np.zeros_like(np.asarray(ces, dtype=np.float32))
+        return ces, ees
+
     def __getitem__(self, index):
         sample = self.samples[index]
 
         if self.input_mode == 'current_voltage':
+            ces, ees = self._cycle_efficiency_features(sample)
             output = {
                 'soh_trajectory': torch.FloatTensor(sample['soh_trajectory']),
                 'trajectory_mask': torch.FloatTensor(sample['trajectory_mask']),
@@ -954,19 +968,20 @@ class Dataset_SOH_Forecasting(Dataset):
                 'soh_input': torch.FloatTensor(sample['soh_input']),
                 'eol_index': torch.FloatTensor([sample['eol_index']]),
                 'aging_condition_embedding': torch.tensor(sample['aging_condition_embedding']),
-                'CEs': torch.FloatTensor(sample['CEs']),
-                'EEs': torch.FloatTensor(sample['EEs']),
+                'CEs': torch.FloatTensor(ces),
+                'EEs': torch.FloatTensor(ees),
                 'file_name': sample['file_name'],
             }
         elif self.input_mode == 'soh_to_soh':
+            ces, ees = self._cycle_efficiency_features(sample)
             output = {
                 'soh_trajectory': torch.FloatTensor(sample['soh_trajectory']),
                 'trajectory_mask': torch.FloatTensor(sample['trajectory_mask']),
                 'soh_input': torch.FloatTensor(sample['soh_input']),
                 'eol_index': torch.FloatTensor([sample['eol_index']]),
                 'aging_condition_embedding': torch.tensor(sample['aging_condition_embedding']),
-                'CEs': torch.FloatTensor(sample['CEs']),
-                'EEs': torch.FloatTensor(sample['EEs']),
+                'CEs': torch.FloatTensor(ces),
+                'EEs': torch.FloatTensor(ees),
                 'file_name': sample['file_name'],
             }
         elif self.input_mode == 'capacity_increment':

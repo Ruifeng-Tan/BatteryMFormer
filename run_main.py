@@ -27,10 +27,26 @@ from pathlib import Path
 
 warnings.filterwarnings('ignore')
 
-BATTERYMFORMER_LOSS_MODELS = {
-    'BatteryMFormer',
-}
+if not hasattr(wandb, "init"):
+    class _NullWandbRun:
+        def __init__(self):
+            self.summary = {}
 
+    class _NullWandb:
+        def __init__(self):
+            self.run = None
+
+        def init(self, **kwargs):
+            self.run = _NullWandbRun()
+            return self.run
+
+        def log(self, *args, **kwargs):
+            return None
+
+        def finish(self):
+            self.run = None
+
+    wandb = _NullWandb()
 
 def parse_wandb_tags(tags):
     """Parse a comma-separated tag string into a clean list."""
@@ -195,6 +211,7 @@ def vali_model(loader, model, criterion, accelerator, args, print_progress=False
     Returns: avg_loss, mape, mae, rmse
     """
     model.eval()
+    total_loss = 0.0
     count = 0
     preds = []
     targets = []
@@ -211,6 +228,8 @@ def vali_model(loader, model, criterion, accelerator, args, print_progress=False
             else:
                 outputs = model(soh_input=soh_input)
 
+            loss = criterion(outputs, soh_trajectory, trajectory_mask)
+            total_loss += loss.item()
             count += 1
 
             # Gather for metrics
@@ -224,12 +243,14 @@ def vali_model(loader, model, criterion, accelerator, args, print_progress=False
             if print_progress and (batch_idx + 1) % 10 == 0:
                 accelerator.print(f'  Processed {batch_idx + 1}/{len(loader)} batches')
 
+    accelerator.wait_for_everyone()
     preds_np = np.concatenate(preds, axis=0)
     targets_np = np.concatenate(targets, axis=0)
     masks_np = np.concatenate(masks, axis=0)
     eol_threshold = get_eol_threshold_for_dataset(args.dataset)
     mape, rmse, mae = calculate_masked_metrics(preds_np, targets_np, masks_np, eol_threshold)
-    return mape, mape, mae, rmse
+    avg_loss = total_loss / max(count, 1)
+    return avg_loss, mape, mae, rmse
 
 
 def train(model, train_loader, val_loader, test_loader, optimizer, criterion, accelerator, args, scheduler=None):
@@ -288,8 +309,8 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
             else:
                 outputs, recovery_loss, life_pred_loss, embedding_alignment_loss, aug_loss = model(soh_input=soh_input)
 
-            if args.model in BATTERYMFORMER_LOSS_MODELS:
-                loss = criterion(outputs, soh_trajectory, trajectory_mask) + args.lambda_recovery * recovery_loss + args.lambda_mem * embedding_alignment_loss 
+            if args.model == 'BatteryMFormer':
+                loss = criterion(outputs, soh_trajectory, trajectory_mask) + args.lambda_recovery * recovery_loss + args.lambda_mem * embedding_alignment_loss
             else:
                 loss = criterion(outputs, soh_trajectory, trajectory_mask)
             accelerator.backward(loss)
@@ -314,7 +335,7 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
             # Print progress occasionally
             print_freq = 1 if len(train_loader) < 10 else 100
             if batch_idx % print_freq == 0:
-                if args.model in BATTERYMFORMER_LOSS_MODELS:
+                if args.model == 'BatteryMFormer':
                     accelerator.print(f'Epoch {epoch+1}/{args.train_epochs}, Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.6f}, Embedding Alignment Loss: {embedding_alignment_loss.item():.6f}, Recovery Loss: {recovery_loss.item():.6f}')
                 else:
                     accelerator.print(f'Epoch {epoch+1}/{args.train_epochs}, Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.6f}')
@@ -382,12 +403,13 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
         # ===========================
         # 4. Logging & Saving
         # ===========================
+        accelerator.wait_for_everyone()
         current_lr = optimizer.param_groups[0]['lr']
-        accelerator.print(f'Epoch {epoch+1}/{args.train_epochs}:')
+        accelerator.print(f'Epoch {epoch+1}/{args.train_epochs}:', flush=True)
         if accelerator.is_main_process:
             accelerator.print(f'  Train -> Loss: {avg_train_loss:.6f}, MAPE: {train_mape:.2f}%, RMSE: {train_rmse:.6f}, MAE: {train_mae:.6f}')
             accelerator.print(f'  Val   -> Loss: {avg_val_loss:.6f}, MAPE: {val_mape:.2f}%, RMSE: {val_rmse:.6f}, MAE: {val_mae:.6f}')
-            accelerator.print(f'  Test  -> Loss: {avg_test_loss:.6f}, MAPE: {test_mape:.2f}%, RMSE: {test_rmse:.6f}, MAE: {test_mae:.6f}')
+            accelerator.print(f'  Test  -> Loss: {avg_test_loss:.6f}, MAPE: {test_mape:.2f}%, RMSE: {test_rmse:.6f}, MAE: {test_mae:.6f}', flush=True)
             
             # Log all metrics to WandB
             wandb.log({
@@ -409,13 +431,14 @@ def train(model, train_loader, val_loader, test_loader, optimizer, criterion, ac
                 "LR": current_lr
             })
 
-        accelerator.print(f'  LR: {current_lr:.6e}')
+        accelerator.print(f'  LR: {current_lr:.6e}', flush=True)
 
+        accelerator.wait_for_everyone()
         early_stopping(epoch+1, val_mape, val_mae, test_mae, model, checkpoint_path)
         if early_stopping.early_stop:
             accelerator.print("Early stopping")
             accelerator.set_trigger()
-            
+
         if accelerator.check_trigger():
             break
 
@@ -460,7 +483,7 @@ def main():
 
     # Model parameters
     parser.add_argument('--model', type=str, required=True,
-                        help='Model name (PatchTST, iTransformer, DLinear, Autoformer, CPTransformer, CPMLP, TimeMixer, WPMixer, BatteryDformer_*, MultiPatchFormer)')
+                        help='Model name (BatteryMFormer, PatchTST, iTransformer, DLinear, CPTransformer, CPMLP, ConvTimeNet, TimeBridge, TimeMixerPP, PatchMLP, IC2ML)')
     parser.add_argument('--checkpoints', type=str, required=True,
                         help='Path to save model checkpoints')
 

@@ -8,6 +8,17 @@ from datetime import datetime
 import argparse
 
 
+def fix_spike_drops(raw_sohs, max_drop_per_cycle=0.04):
+    """Replace abnormal single-cycle SOH drops with the previous cycle's value."""
+    if len(raw_sohs) <= 1:
+        return list(raw_sohs)
+    fixed = list(raw_sohs)
+    for i in range(1, len(raw_sohs)):
+        if fixed[i - 1] - raw_sohs[i] > max_drop_per_cycle:
+            fixed[i] = fixed[i - 1]
+    return fixed
+
+
 def main(raw_data_file_path, output_path):
     sheets = ['0℃循环', '25℃ 循环', '35℃ 循环', '45℃循环']
 
@@ -81,6 +92,13 @@ def main(raw_data_file_path, output_path):
             # Skip batteries whose final SOH is far from EOL
             if raw_sohs[-1] > filter_threshold:
                 continue
+
+            # CALB_35_B229 has an abnormal capacity dip around cycle 697 that
+            # briefly pushes SOH below the EOL threshold before recovering;
+            # without correction the EOL search would end its life ~474 cycles
+            # early. BatteryLife v11 corrects this cell's life label likewise.
+            if cell_name == 'CALB_35_B229':
+                raw_sohs = fix_spike_drops(raw_sohs, max_drop_per_cycle=0.03)
 
             if raw_sohs[-1] <= eol_threshold:
                 extrapolated = False
