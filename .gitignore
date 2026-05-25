@@ -176,3 +176,9 @@ hyper.tex
 meeting.txt
 data .md
 calb.md
+
+# =========================
+# Fine-tuning (not in paper, kept locally only)
+# =========================
+finetune_model.py
+train_eval_scripts/finetune_model.sh

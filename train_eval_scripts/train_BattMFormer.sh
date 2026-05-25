@@ -3,34 +3,39 @@
 # ==========================================
 # 1. Hardware & Environment Setup
 # ==========================================
-# Specify GPU IDs to use (e.g., "0" or "0,1,2,3")
 gpu_ids=0,1
-# Specify the number of GPUs (must match the count in gpu_ids)
 num_process=2
-# Main process port (avoid conflicts among multiple runs)
 master_port=29447
 seed=2024
+
 # ==========================================
 # 2. Model & Data Configuration
 # ==========================================
 model_name=BatteryMFormer
-dataset=NA-ion
+dataset=Li_ion
 input_mode=current_voltage  # Options: current_voltage or soh_to_soh
 
 # ---------- Evaluation Protocol ----------
-# We use Leave-One-Aging-condition-Out (LOAO) evaluation by default.
-# Each split holds out one aging condition for testing.
-# Available LOAO splits:
-#   CALB:   data_provider/split_json/loao/CALB_loao_cond{396..399}_seed{2021,42,2024}.json  (4 folds x 3 seeds)
-#   NA-ion: data_provider/split_json/loao/NA-ion_loao_cond{400..411}_seed{2021,42,2024}.json (12 folds x 3 seeds)
-# For Li-ion pure-OOD evaluation:
-#   data_provider/split_json/pure_ood/Liion_split_seed{2021,42,2024}.json
-# To use the legacy random split, leave split_json_path empty.
-split_json_path=./data_provider/split_json/loao/NA-ion_loao_cond400_seed2024.json
+# Default: Li-ion pure-OOD split (used in the Quick start of README).
+# Other available splits:
+#   Li-ion pure-OOD:  data_provider/split_json/pure_ood/Liion_split_seed{2021,42,2024}.json
+#   Zn-ion pure-OOD:  data_provider/split_json/pure_ood/ZNcoin_split_seed{2021,42,2024}.json
+#   CALB LOAO:        data_provider/split_json/loao/CALB_loao_cond{396..399}_seed2021.json
+#   NA-ion LOAO:      data_provider/split_json/loao/NA-ion_loao_cond{400..411}_seed2021.json
+# Leave this empty to fall back to the legacy random split.
+split_json_path=./data_provider/split_json/pure_ood/Liion_split_seed2024.json
 
-# ========================================== 
+# Paths (modify these to match your environment)
+root_path=/path/to/your/dataset
+processed_SOH_path=/path/to/your/processed_SOH
+cache_root=/path/to/your/cache
+
+# ==========================================
 # 3. Model Architecture Hyperparameters
 # ==========================================
+# Defaults below are from the Li_ion seed2024 fold in
+# `asset/per_fold_hyperparameters.md`. For other folds / datasets,
+# refer to that file and adjust accordingly.
 enc_in=3
 num_slots=64
 kernel_size=10
@@ -38,22 +43,21 @@ stride=10
 cnn_channels=16
 num_segments=50
 top_k=2
-num_query=10
+num_query=8
 temperature=1.0
 
-k_dim=256
-d_model=64
+k_dim=512
+d_model=128
 n_heads=8
 e_layers=2
-d_layers=8
+d_layers=4
 d_ff=128
 d_ffs=128
-dropout=0.12
+dropout=0.2
 weight_decay=0.0
 activation=gelu
 factor=1
 d_llm=1024
-
 
 # ==========================================
 # 4. Training Hyperparameters
@@ -61,12 +65,12 @@ d_llm=1024
 lambda_recovery=100.0
 lambda_mem=10.0
 lambda_life_loss=0.0
-batch_size=64       # Per-GPU batch size (global batch = batch_size * num_process)
-train_epochs=200
-learning_rate=7.78e-05
+batch_size=128      # Per-GPU batch size (global batch = batch_size * num_process)
+train_epochs=300
+learning_rate=1.5e-04
 lradj=constant
 warmup_epochs=5
-patience=20
+patience=30
 use_grad_clip=False
 
 # ==========================================
@@ -80,21 +84,16 @@ eol_threshold=0.8
 truncate_start_cycle=100
 task_name=soh_forecast
 
-# Paths (modify these to match your environment)
-root_path=/path/to/your/dataset
-processed_SOH_path=/path/to/your/processed_SOH
-cache_root=/path/to/your/cache
-
 # Derive a short split tag from split_json_path for checkpoint/cache isolation
 split_tag=$(basename "$split_json_path" .json)
 checkpoints="./checkpoints/${model_name}_${dataset}_${split_tag}_dm${d_model}_dff${d_ff}_el${e_layers}_dl${d_layers}_bs${batch_size}_lr${learning_rate}_seed${seed}"
+
 # ==========================================
 # 6. Execution Command
 # ==========================================
 # Note: Remove --resume_existing if you do not need to resume training
 # Note: --mixed_precision fp16 corresponds to --use_amp in the original script
 
-# Build the base command
 BASE_CMD="CUDA_VISIBLE_DEVICES=$gpu_ids accelerate launch \
   --mixed_precision fp16 \
   --num_processes $num_process \
@@ -152,27 +151,19 @@ BASE_CMD="CUDA_VISIBLE_DEVICES=$gpu_ids accelerate launch \
   --kernel_size $kernel_size \
   --cnn_channels $cnn_channels \
   --stride $stride \
-  --d_ffs $d_ffs" 
+  --d_ffs $d_ffs"
 
 
-# Add gradient clipping arguments based on use_grad_clip
 if [ "$use_grad_clip" = "True" ] || [ "$use_grad_clip" = "true" ]; then
     echo "Enable gradient clipping..."
-    # Add gradient clipping flag (add other related arguments here if needed)
     FULL_CMD="$BASE_CMD --use_grad_clip"
-    
-    # If you want to set a clipping threshold, add extra arguments (optional)
-    # max_grad_norm=1.0
-    # FULL_CMD="$BASE_CMD --use_grad_clip --max_grad_norm $max_grad_norm"
 else
     echo "Do not use gradient clipping..."
     FULL_CMD="$BASE_CMD"
 fi
 
-# Print the full command
 echo "Executing command:"
 echo "$FULL_CMD"
 echo ""
 
-# Execute the command
 eval $FULL_CMD
