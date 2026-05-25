@@ -13,6 +13,9 @@ reformer-pytorch==1.4.4
 PyWavelets==1.6.0
 safetensors==0.7.0
 accelerate==1.10.1
-optuna==4.6.0
 wandb==0.23.1
 huggingface_hub==1.2.3
+# Only required to regenerate aging-condition embeddings
+# (generate_aging_condition_new_dataset.ipynb). The shipped
+# Qwen3_total.pkl can be used directly without installing this.
+transformers>=4.51
