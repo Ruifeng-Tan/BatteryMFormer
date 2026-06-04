@@ -24,6 +24,16 @@ gpu=0
 dataset=Li_ion
 seed=2024
 
+# ---------- Evaluation Protocol ----------
+# Use the same split json that was used at training time so the cached preprocessed
+# data lines up. Available splits:
+#   Li-ion pure-OOD:  data_provider/split_json/pure_ood/Liion_split_seed{2021,42,2024}.json
+#   Zn-ion pure-OOD:  data_provider/split_json/pure_ood/ZNcoin_split_seed{2021,42,2024}.json
+#   CALB LOAO:        data_provider/split_json/loao/CALB_loao_cond{396..399}_seed2021.json
+#   NA-ion LOAO:      data_provider/split_json/loao/NA-ion_loao_cond{400..411}_seed2021.json
+# Leave empty to fall back to the legacy random split.
+split_json_path=./data_provider/split_json/pure_ood/Liion_split_seed2024.json
+
 # ==========================================
 # 3. Data Parameters (must match cached data)
 # ==========================================
@@ -42,6 +52,8 @@ output_dir=./results/timesfm
 # ==========================================
 # 5. Execution Command
 # ==========================================
+split_tag=$(basename "$split_json_path" .json)
+
 python train_eval_scripts/eval_timesfm.py \
     --dataset $dataset \
     --seed $seed \
@@ -54,4 +66,6 @@ python train_eval_scripts/eval_timesfm.py \
     --batch_size $batch_size \
     --gpu $gpu \
     --cache_root $cache_root \
-    --output_dir $output_dir
+    --output_dir $output_dir \
+    --split_json_path $split_json_path \
+    --split_tag $split_tag

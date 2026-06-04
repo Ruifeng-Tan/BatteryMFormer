@@ -1,10 +1,11 @@
 """
-TimesFM Baseline Evaluation for SOH Trajectory Prediction
-TimesFM is a pretrained foundation model for time series forecasting from Google.
-It only supports single-variable input (SOH sequence), NOT charge/discharge curves.
+TimesFM baseline evaluation for SOH trajectory prediction.
 
-IMPORTANT: TimesFM has a bug with padded inputs (mask=True produces NaN).
-Solution: Truncate input to multiple of patch_size (32) instead of padding.
+TimesFM only consumes a single-variable input (the SOH sequence) and requires the
+input length to be a multiple of patch_size (32). Because masked positions output
+NaN, we pad at the end with the last observed SOH and keep mask=False everywhere;
+the padded region uses the padded SOH itself as the prediction and the model's
+real forecast starts at cycle padded_len+1.
 """
 
 import os
@@ -16,6 +17,7 @@ import torch
 from tqdm import tqdm
 import json
 from collections import defaultdict
+from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,6 +46,12 @@ def parse_args():
     # EOL threshold
     parser.add_argument('--eol_threshold', type=float, default=0.8)
 
+    # Split (must match the split used at training time so the cache lines up)
+    parser.add_argument('--split_json_path', type=str, default='',
+                        help='Path to split json (LOAO / pure-OOD). Leave empty for legacy random split.')
+    parser.add_argument('--split_tag', type=str, default='',
+                        help='Optional split tag. If empty, derived from --split_json_path filename.')
+
     # Output
     parser.add_argument('--output_dir', type=str, default='./results/timesfm')
     parser.add_argument('--gpu', type=int, default=0)
@@ -54,11 +62,18 @@ def parse_args():
 
 
 def load_cache_data(args):
-    """Load preprocessed data from cache"""
+    """Load preprocessed data from cache. Key must match data_loader_soh_optimized.py."""
     cache_key = (f"{args.dataset}_{args.seed}_{args.flag}_current_voltage_"
                  f"{args.early_cycle_threshold}_{args.charge_discharge_length}_"
                  f"{args.seq_len}_{args.max_trajectory_len}_"
                  f"capresample{args.use_capacity_resample}_v3_soc_alignchk1")
+
+    split_tag = args.split_tag
+    if not split_tag and args.split_json_path:
+        split_tag = Path(args.split_json_path).stem
+    if split_tag:
+        cache_key += f"_split{split_tag}"
+
     cache_file = f"{args.cache_root}/{cache_key}.pkl"
 
     if not os.path.exists(cache_file):
@@ -148,38 +163,23 @@ def normalize_soh(soh_real, eol_threshold=0.8):
 
 
 def timesfm_predict_batch(model, soh_inputs, horizon, patch_size=32):
-    """
-    Run TimesFM prediction on a batch of SOH inputs with same truncated length.
+    """Run TimesFM on a batch of SOH inputs that share the same padded length.
 
-    IMPORTANT: TimesFM produces NaN when input is padded with mask=True.
-    Solution: Truncate each input to multiple of patch_size (32).
-
-    For batch processing, all inputs in the batch must have the same length.
-    Group by truncated length before calling this function.
-
-    Args:
-        model: TimesFM model (with model.model.decode available)
-        soh_inputs: List of 1D numpy arrays (real SOH values) with SAME truncated length
-        horizon: Number of cycles to predict
-        patch_size: TimesFM's patch size (default 32)
-
-    Returns:
-        List of predictions, each of shape [horizon]
+    Each input is padded at the end with its last value to the next multiple
+    of patch_size; mask stays all False to avoid the NaN bug. Group by
+    padded length before calling.
     """
     if len(soh_inputs) == 0:
         return []
 
     device = model.model.device
 
-    # Process all inputs to same truncated length
+    # Pad each input at the end with its last value to next multiple of patch_size
     processed_inputs = []
     for soh in soh_inputs:
-        valid_len = (len(soh) // patch_size) * patch_size
-        if valid_len == 0:
-            valid_len = patch_size
-            soh = np.pad(soh, (patch_size - len(soh), 0), 'edge')
-        else:
-            soh = soh[-valid_len:]
+        padded_len = ((len(soh) + patch_size - 1) // patch_size) * patch_size
+        if padded_len > len(soh):
+            soh = np.pad(soh, (0, padded_len - len(soh)), 'edge')
         processed_inputs.append(soh)
 
     # Stack into batch
@@ -250,7 +250,7 @@ def evaluate_timesfm(args):
 
             # Get visible SOH (normalized)
             visible_soh_norm = get_visible_soh(soh_input)
-            if len(visible_soh_norm) < 2:
+            if len(visible_soh_norm) < 1:
                 continue
 
             input_len = len(visible_soh_norm)
@@ -273,17 +273,15 @@ def evaluate_timesfm(args):
     max_horizon = args.max_trajectory_len
     print(f"Using horizon: {max_horizon}")
 
-    # Group samples by truncated input length for efficient batching
+    # Group samples by padded input length (next multiple of patch_size) for efficient batching
     patch_size = 32
-    samples_by_truncated_len = defaultdict(list)
+    samples_by_padded_len = defaultdict(list)
     for idx, info in enumerate(all_samples_info):
         input_len = info['input_len']
-        truncated_len = (input_len // patch_size) * patch_size
-        if truncated_len == 0:
-            truncated_len = patch_size
-        samples_by_truncated_len[truncated_len].append((idx, info))
+        padded_len = ((input_len + patch_size - 1) // patch_size) * patch_size
+        samples_by_padded_len[padded_len].append((idx, info))
 
-    print(f"Grouped into {len(samples_by_truncated_len)} truncated length groups")
+    print(f"Grouped into {len(samples_by_padded_len)} padded length groups")
 
     # Evaluate with batched inference - collect all predictions in normalized form
     # to match run_main.py's global metric calculation
@@ -294,7 +292,7 @@ def evaluate_timesfm(args):
 
     batch_size = args.batch_size
 
-    for truncated_len, group in tqdm(samples_by_truncated_len.items(), desc="Processing groups"):
+    for padded_len, group in tqdm(samples_by_padded_len.items(), desc="Processing groups"):
         # Process this group in batches
         for batch_start in range(0, len(group), batch_size):
             batch = group[batch_start:batch_start + batch_size]
@@ -317,13 +315,17 @@ def evaluate_timesfm(args):
                 mask = info['mask']
                 eol_thresh = info['eol_threshold']
 
-                # Create full prediction array in REAL scale first
+                # Real cycles + padded region (last SOH) + model forecast from padded_len+1
                 full_pred_real = np.zeros(args.max_trajectory_len)
-                full_pred_real[:input_len] = visible_soh_real  # Input part (real scale)
-
-                pred_len = min(len(pred), args.max_trajectory_len - input_len)
-                if pred_len > 0:
-                    full_pred_real[input_len:input_len+pred_len] = pred[:pred_len]
+                full_pred_real[:input_len] = visible_soh_real
+                pad_end = min(padded_len, args.max_trajectory_len)
+                if pad_end > input_len:
+                    full_pred_real[input_len:pad_end] = visible_soh_real[-1]
+                pred_start = padded_len
+                if pred_start < args.max_trajectory_len:
+                    pred_len = min(len(pred), args.max_trajectory_len - pred_start)
+                    if pred_len > 0:
+                        full_pred_real[pred_start:pred_start+pred_len] = pred[:pred_len]
 
                 # Convert prediction to normalized scale (same as target)
                 full_pred_normalized = normalize_soh(full_pred_real, eol_thresh)
@@ -377,14 +379,21 @@ def evaluate_timesfm(args):
         if input_len in key_lengths:
             print(f"Input {input_len:3d} cycles: MAPE={mape:7.4f}%, RMSE={rmse:.6f}, MAE={mae:.6f}, n={int(mask_for_len.sum())}")
 
-    # Save results
     os.makedirs(args.output_dir, exist_ok=True)
-    result_file = os.path.join(args.output_dir, f"timesfm_{args.dataset}_seed{args.seed}_{args.flag}.json")
+    split_tag = args.split_tag
+    if not split_tag and args.split_json_path:
+        split_tag = Path(args.split_json_path).stem
+    suffix = f"_{split_tag}" if split_tag else ""
+    result_file = os.path.join(
+        args.output_dir,
+        f"timesfm_{args.dataset}_seed{args.seed}{suffix}_{args.flag}.json"
+    )
 
     results = {
         'dataset': args.dataset,
         'seed': args.seed,
         'flag': args.flag,
+        'split_tag': split_tag,
         'avg_mape': float(avg_mape),
         'avg_rmse': float(avg_rmse),
         'avg_mae': float(avg_mae),
